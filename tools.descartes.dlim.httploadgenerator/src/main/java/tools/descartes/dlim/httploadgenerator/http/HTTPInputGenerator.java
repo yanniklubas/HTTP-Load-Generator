@@ -18,9 +18,12 @@ package tools.descartes.dlim.httploadgenerator.http;
 import java.io.File;
 import java.util.concurrent.TimeUnit;
 import java.util.logging.Logger;
+import java.util.regex.Pattern;
 
 import org.eclipse.jetty.client.HttpClient;
 import org.eclipse.jetty.client.api.Request;
+import org.eclipse.jetty.client.util.StringContentProvider;
+import org.eclipse.jetty.http.HttpMethod;
 import org.luaj.vm2.Globals;
 import org.luaj.vm2.LuaTable;
 import org.luaj.vm2.LuaValue;
@@ -33,43 +36,49 @@ import tools.descartes.dlim.httploadgenerator.http.lua.HTMLLuaFunctions.GetMatch
 /**
  * Stateful Generator for the next HTTP-GET or POST URL.
  * URLs are generated from the script passed in the constructor.
+ *
  * @author Joakim von Kistowski
  */
 public class HTTPInputGenerator {
 
 	private static final Logger LOG = Logger.getLogger(HTTPInputGenerator.class.getName());
-	
+
 	private static final String USER_AGENT = "Mozilla/5.0";
-	
+
 	private static final String LUA_CYCLE_INIT = "onCycle";
 	private static final String LUA_CALL = "onCall";
 
+	private static final String JSON_SIGNAL = "[JSON]";
 
 	private final HttpClient httpClient;
-	
+
 	private int id;
-	
+
 	private int currentCallNum = 0;
 	private String lastInput = "";
 	private int timeout = 0;
 
 	private HTMLFunctions htmlFunctions = new HTMLFunctions("");
 	private Globals luaGlobals;
+
 	/**
 	 * Constructs a new HTTPInputGenerator using a Lua generation script.
 	 * The Lua script must contain the onInit() and onCall(callnum) functions.
-	 * onCall(callnum) must return the HTTP request for a specific call with number callnum.
-	 * callnum begins at 1 (Lua convention) and increments for each call. It resets back to 1
+	 * onCall(callnum) must return the HTTP request for a specific call with number
+	 * callnum.
+	 * callnum begins at 1 (Lua convention) and increments for each call. It resets
+	 * back to 1
 	 * if onCall returns nil.
-	 * @param id The input generator's id.
+	 *
+	 * @param id         The input generator's id.
 	 * @param scriptFile The url generator script.
 	 * @param randomSeed Seed for Lua random function.
-	 * @param timeout The http read timeout.
+	 * @param timeout    The http read timeout.
 	 */
 	public HTTPInputGenerator(int id, File scriptFile, int randomSeed, int timeout) {
 		this.id = id;
 		httpClient = new HttpClient();
-		
+
 		if (timeout > 0) {
 			httpClient.setConnectTimeout(timeout);
 			this.timeout = timeout;
@@ -79,7 +88,7 @@ public class HTTPInputGenerator {
 		} catch (Exception e) {
 			LOG.severe("Could not start HTTP client; Exception: " + e.getMessage());
 		}
-		
+
 		if (scriptFile != null) {
 			luaGlobals = JsePlatform.standardGlobals();
 			LuaValue library = new LuaTable();
@@ -93,12 +102,20 @@ public class HTTPInputGenerator {
 
 	/**
 	 * Builds a request using the HTTP client and current cookies.
+	 *
 	 * @return The http client's initialized request.
 	 */
 	public Request initializeHTTPRequest(String url, String method) {
-	Request request;
+		Request request;
 		if (method.equalsIgnoreCase("POST")) {
-			 request = httpClient.POST(url);
+			String split[] = url.split(Pattern.quote(JSON_SIGNAL), 2);
+			url = split[0].trim();
+			request = httpClient.POST(url);
+			if (split.length == 2) {
+				request.content(new StringContentProvider(split[1]), "application/json");
+			}
+		} else if (method.equalsIgnoreCase("PUT")) {
+			request = httpClient.newRequest(url).method(HttpMethod.PUT);
 		} else {
 			request = httpClient.newRequest(url);
 		}
@@ -112,6 +129,7 @@ public class HTTPInputGenerator {
 
 	/**
 	 * Returns the next URL for the HTTPTransaction. Runs the script.
+	 *
 	 * @return The next URL to call.
 	 */
 	public String getNextInput() {
@@ -146,36 +164,40 @@ public class HTTPInputGenerator {
 
 	/**
 	 * Current number of the lua call (position in call cycle).
+	 *
 	 * @return The current number of the lua call.
 	 */
 	public int getCurrentCallNum() {
 		return currentCallNum;
 	}
-	
+
 	/**
 	 * Reset the HTML functions that are passed to LUA.
+	 *
 	 * @param html The html response that will be accessed from LUA next.
 	 */
 	public void resetHTMLFunctions(String html) {
 		htmlFunctions.resetHTMLFunctions(html);
 	}
-	
+
 	/**
 	 * Get the last call that was generated on calling {@link #getNextInput()}.
+	 *
 	 * @return The last call URL.
 	 */
 	public String getLastCall() {
 		return lastInput;
 	}
-	
+
 	/**
 	 * Get the current HTML content that was last received using this generator.
+	 *
 	 * @return The HTML content.
 	 */
 	public String getCurrentHTML() {
 		return htmlFunctions.getHTML();
 	}
-	
+
 	/**
 	 * Decrements the last call number. Use this after an unsuccessful call
 	 * in order to be repeat it on the next call of {@link #getNextInput()}.
@@ -186,6 +208,7 @@ public class HTTPInputGenerator {
 
 	/**
 	 * Get the timeout.
+	 *
 	 * @return The timeout in Milliseconds.
 	 */
 	public int getTimeout() {
