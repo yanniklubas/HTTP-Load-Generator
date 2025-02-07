@@ -107,10 +107,13 @@ public class HTTPInputGenerator {
 	 */
 	public Request initializeHTTPRequest(String url, String method) {
 		Request request;
+		System.out.println(method);
 		if (method.equalsIgnoreCase("POST")) {
 			String split[] = url.split(Pattern.quote(JSON_SIGNAL), 2);
 			url = split[0].trim();
+			System.out.println(url);
 			request = httpClient.POST(url);
+			System.out.println(split.length);
 			if (split.length == 2) {
 				request.content(new StringContentProvider(split[1]), "application/json");
 			}
