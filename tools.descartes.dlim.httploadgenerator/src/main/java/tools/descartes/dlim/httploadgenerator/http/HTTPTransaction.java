@@ -31,21 +31,23 @@ import tools.descartes.dlim.httploadgenerator.transaction.TransactionInvalidExce
 import tools.descartes.dlim.httploadgenerator.transaction.TransactionQueueSingleton;
 
 /**
- * HTTP transaction sends HTML requests to a HTTP web server based on a LUA script.
+ * HTTP transaction sends HTML requests to a HTTP web server based on a LUA
+ * script.
  * 
  * @author Joakim von Kistowski, Maximilian Deffner
  *
  */
 public class HTTPTransaction extends Transaction {
 
-	
 	private static final String POST_SIGNAL = "[POST]";
-	
+	private static final String PUT_SIGNAL = "[PUT]";
+
 	/** The constant logging instance. */
 	private static final Logger LOG = Logger.getLogger(HTTPTransaction.class.getName());
 
 	/**
 	 * Processes the transaction of sending a GET request to a web server.
+	 * 
 	 * @param generator The input generator to use.
 	 * @return Response time in milliseconds.
 	 */
@@ -53,7 +55,8 @@ public class HTTPTransaction extends Transaction {
 		long processStartTime = System.currentTimeMillis();
 		if (generator.getTimeout() > 0 && processStartTime - getStartTime() > generator.getTimeout()) {
 			throw new TransactionDroppedException("Wait time in queue too long. "
-					+ String.valueOf(processStartTime - getStartTime()) + " ms passed before transaction was even started.");
+					+ String.valueOf(processStartTime - getStartTime())
+					+ " ms passed before transaction was even started.");
 		}
 		String url = generator.getNextInput().trim();
 		String method = "GET";
@@ -61,10 +64,13 @@ public class HTTPTransaction extends Transaction {
 			if (url.startsWith(POST_SIGNAL)) {
 				method = "POST";
 			}
-			url = url.replaceFirst("\\[.*\\]", "");
+			if (url.startsWith(PUT_SIGNAL)) {
+				method = "PUT";
+			}
+			url = url.replaceFirst("\\[.*?\\]", "");
 		}
 		Request request = generator.initializeHTTPRequest(url, method);
-		
+
 		try {
 			ContentResponse response = request.send();
 			if (response.getStatus() >= 400) {
@@ -74,16 +80,18 @@ public class HTTPTransaction extends Transaction {
 			} else {
 				String responseBody = response.getContentAsString();
 				long responseTime = System.currentTimeMillis() - processStartTime;
-				
-				//store result
+
+				// store result
 				generator.resetHTMLFunctions(responseBody);
 				return responseTime;
 			}
 		} catch (TimeoutException e) {
 			generator.revertLastCall();
+			throw new TransactionInvalidException("TimeoutException: " + e.getMessage());
 		} catch (ExecutionException e) {
 			if (e.getCause() == null || !(e.getCause() instanceof TimeoutException)) {
-				LOG.log(Level.SEVERE, "ExecutionException in call for URL: " + url + "; Cause: " + e.getCause().toString());
+				LOG.log(Level.SEVERE,
+						"ExecutionException in call for URL: " + url + "; Cause: " + e.getCause().toString());
 			}
 			generator.revertLastCall();
 			throw new TransactionInvalidException("ExecutionException: " + e.getMessage());
@@ -96,7 +104,6 @@ public class HTTPTransaction extends Transaction {
 			generator.revertLastCall();
 			throw new TransactionInvalidException("InterruptedException: " + e.getMessage());
 		}
-		return 0;
 	}
 
 	@Override
