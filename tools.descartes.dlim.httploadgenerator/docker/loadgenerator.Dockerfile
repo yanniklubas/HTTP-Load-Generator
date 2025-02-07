@@ -1,7 +1,7 @@
 FROM openjdk:slim
 
 RUN mkdir -p /opt/httploadgenerator
-COPY ../target/httploadgenerator.jar /opt/httploadgenerator/
+COPY target/httploadgenerator.jar /opt/httploadgenerator/
 
 ENV RUNMODE loadgenerator
 
