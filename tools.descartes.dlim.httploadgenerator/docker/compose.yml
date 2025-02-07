@@ -1,14 +1,14 @@
 services:
   loadgenerator:
     build:
-      context: "."
-      dockerfile: loadgenerator.Dockerfile
+      context: ".."
+      dockerfile: docker/loadgenerator.Dockerfile
     extra_hosts:
       - "host.docker.internal:host-gateway"
   director:
     build:
-      context: "."
-      dockerfile: director.Dockerfile
+      context: ".."
+      dockerfile: docker/director.Dockerfile
     extra_hosts:
       - "host.docker.internal:host-gateway"
     volumes:
