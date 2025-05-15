@@ -21,20 +21,21 @@
   *
   */
 public class IntervalResult {
-	
+
 	private double targetTime;
 	private double loadIntensity;
 	private int successfulTransactions;
 	private double avgResponseTime;
 	private int failedTransactions;
+	private int timeoutTransactions;
 	private int droppedTransactions;
 	private double finalBatchTime;
 	private boolean measurementConcluded = false;
-	
+
 	public static IntervalResult createIntervalResultWithMeasurementConcludedFlag() {
 		return new IntervalResult();
 	}
-	
+
 	/**
 	 * Creates a new interval result with measurement results.
 	 * @param targetTime he target time.
@@ -46,18 +47,19 @@ public class IntervalResult {
 	 * @param finalBatchTime The final batch time.
 	 */
 	public IntervalResult(double targetTime, double loadIntensity, int successfulTransactions,
-			int failedTransactions, int droppedTransactions,
+			int failedTransactions, int timeoutTransactions, int droppedTransactions,
 			double avgResponseTime, double finalBatchTime) {
 		this.targetTime = targetTime;
 		this.loadIntensity = loadIntensity;
 		this.successfulTransactions = successfulTransactions;
 		this.failedTransactions = failedTransactions;
+		this.timeoutTransactions = timeoutTransactions;
 		this.droppedTransactions = droppedTransactions;
 		this.avgResponseTime = avgResponseTime;
 		this.finalBatchTime = finalBatchTime;
 		this.measurementConcluded = false;
 	}
-	
+
 	/**
 	 * Creates an interval result where measurement has concluded.
 	 * No further results need be provided.
@@ -104,6 +106,14 @@ public class IntervalResult {
 	 */
 	public int getFailedTransactions() {
 		return failedTransactions;
+	}
+
+	/**
+	 * Returns the number of timed out transactions.
+	 * @return Number of timed out transactions.
+	 */
+	public int getTimeoutTransactions() {
+		return timeoutTransactions;
 	}
 
 	/**

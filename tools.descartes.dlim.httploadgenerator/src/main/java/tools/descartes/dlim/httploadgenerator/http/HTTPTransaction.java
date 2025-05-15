@@ -28,12 +28,13 @@ import tools.descartes.dlim.httploadgenerator.generator.ResultTracker;
 import tools.descartes.dlim.httploadgenerator.transaction.Transaction;
 import tools.descartes.dlim.httploadgenerator.transaction.TransactionDroppedException;
 import tools.descartes.dlim.httploadgenerator.transaction.TransactionInvalidException;
+import tools.descartes.dlim.httploadgenerator.transaction.TransactionTimeoutException;
 import tools.descartes.dlim.httploadgenerator.transaction.TransactionQueueSingleton;
 
 /**
  * HTTP transaction sends HTML requests to a HTTP web server based on a LUA
  * script.
- * 
+ *
  * @author Joakim von Kistowski, Maximilian Deffner
  *
  */
@@ -47,11 +48,11 @@ public class HTTPTransaction extends Transaction {
 
 	/**
 	 * Processes the transaction of sending a GET request to a web server.
-	 * 
+	 *
 	 * @param generator The input generator to use.
 	 * @return Response time in milliseconds.
 	 */
-	public long process(HTTPInputGenerator generator) throws TransactionDroppedException, TransactionInvalidException {
+	public long process(HTTPInputGenerator generator) throws TransactionDroppedException, TransactionInvalidException, TransactionTimeoutException {
 		long processStartTime = System.currentTimeMillis();
 		if (generator.getTimeout() > 0 && processStartTime - getStartTime() > generator.getTimeout()) {
 			throw new TransactionDroppedException("Wait time in queue too long. "
@@ -74,9 +75,10 @@ public class HTTPTransaction extends Transaction {
 		try {
 			ContentResponse response = request.send();
 			if (response.getStatus() >= 400) {
+				long responseTime = System.currentTimeMillis() - processStartTime;
 				generator.revertLastCall();
 				LOG.log(Level.FINEST, "Received error response code: " + response.getStatus());
-				throw new TransactionInvalidException("Error code: " + response.getStatus());
+				throw new TransactionInvalidException("Error code: " + response.getStatus(), responseTime);
 			} else {
 				String responseBody = response.getContentAsString();
 				long responseTime = System.currentTimeMillis() - processStartTime;
@@ -87,22 +89,25 @@ public class HTTPTransaction extends Transaction {
 			}
 		} catch (TimeoutException e) {
 			generator.revertLastCall();
-			throw new TransactionInvalidException("TimeoutException: " + e.getMessage());
+			throw new TransactionTimeoutException("TimeoutException: " + e.getMessage());
 		} catch (ExecutionException e) {
+			long responseTime = System.currentTimeMillis() - processStartTime;
 			if (e.getCause() == null || !(e.getCause() instanceof TimeoutException)) {
 				LOG.log(Level.SEVERE,
 						"ExecutionException in call for URL: " + url + "; Cause: " + e.getCause().toString());
 			}
 			generator.revertLastCall();
-			throw new TransactionInvalidException("ExecutionException: " + e.getMessage());
+			throw new TransactionInvalidException("ExecutionException: " + e.getMessage(), responseTime);
 		} catch (CancellationException e) {
+			long responseTime = System.currentTimeMillis() - processStartTime;
 			LOG.log(Level.SEVERE, "CancellationException: " + url + "; " + e.getMessage());
 			generator.revertLastCall();
-			throw new TransactionInvalidException("CancellationException: " + e.getMessage());
+			throw new TransactionInvalidException("CancellationException: " + e.getMessage(), responseTime);
 		} catch (InterruptedException e) {
+			long responseTime = System.currentTimeMillis() - processStartTime;
 			LOG.log(Level.SEVERE, "InterruptedException: " + e.getMessage());
 			generator.revertLastCall();
-			throw new TransactionInvalidException("InterruptedException: " + e.getMessage());
+			throw new TransactionInvalidException("InterruptedException: " + e.getMessage(), responseTime);
 		}
 	}
 
@@ -115,7 +120,9 @@ public class HTTPTransaction extends Transaction {
 		} catch (TransactionDroppedException e) {
 			ResultTracker.TRACKER.logTransaction(0, ResultTracker.TransactionState.DROPPED);
 		} catch (TransactionInvalidException e) {
-			ResultTracker.TRACKER.logTransaction(0, ResultTracker.TransactionState.FAILED);
+			ResultTracker.TRACKER.logTransaction(e.responseTime, ResultTracker.TransactionState.FAILED);
+		} catch (TransactionTimeoutException e) {
+			ResultTracker.TRACKER.logTransaction(generator.getTimeout(), ResultTracker.TransactionState.TIMEOUT);
 		}
 		HTTPInputGeneratorPool.getPool().releaseBackToPool(generator);
 		TransactionQueueSingleton transactionQueue = TransactionQueueSingleton.getInstance();

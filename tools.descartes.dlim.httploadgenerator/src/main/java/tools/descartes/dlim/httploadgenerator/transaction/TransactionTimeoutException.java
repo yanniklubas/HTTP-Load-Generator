@@ -1,5 +1,5 @@
 /**
- * Copyright 2017 Joakim von Kistowski
+ * Copyright 2025 Yannik Lubas
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -16,20 +16,16 @@
 package tools.descartes.dlim.httploadgenerator.transaction;
 
 /**
- * Exception for invalid/failed transactions.
- * Differs from dropped transaction in that these transactions were actually executed but failed.
- * E.g. the received an error status code.
- * @author Joakim von Kistowksi
+ * Exception for timed out transactions.
+ * @author Yannik Lubas
  *
  */
-public class TransactionInvalidException extends Exception {
+public class TransactionTimeoutException extends Exception {
 
-	public final long responseTime;
-
-	public TransactionInvalidException(String message, long responseTime) {
+	public TransactionTimeoutException(String message) {
 		super(message);
-		this.responseTime = responseTime;
 	}
 
 	private static final long serialVersionUID = -4004921011216381942L;
+
 }

@@ -25,28 +25,30 @@ import java.util.concurrent.locks.ReentrantLock;
  *
  */
 public final class ResultTracker {
-	
+
 	/**
 	 * The tracker singleton.
 	 */
 	public static final ResultTracker TRACKER = new ResultTracker();
-	
+
 	private ReentrantLock transactionLock = new ReentrantLock();
-	
+
 	private AtomicLong invalidTransactionsPerMeasurementInterval = new AtomicLong(0);
 	private AtomicLong invalidTransactionsTotal = new AtomicLong(0);
+	private AtomicLong timeoutTransactionsPerMeasurementInterval = new AtomicLong(0);
+	private AtomicLong timeoutTransactionsTotal = new AtomicLong(0);
 	private AtomicLong droppedTransactionsPerMeasurementInterval = new AtomicLong(0);
 	private AtomicLong droppedTransactionsTotal = new AtomicLong(0);
 	private AtomicLong successfulTransactionsPerMeasurementInterval = new AtomicLong(0);
 	private AtomicLong successfulTransactionsTotal = new AtomicLong(0);
-	
+
 	private AtomicLong responseTimeSum = new AtomicLong(0);
 	private AtomicLong responseTimeLogCount = new AtomicLong(0);
-	
+
 	private ResultTracker() {
-		
+
 	}
-	
+
 	/**
 	 * Log a transaction.
 	 * @param responseTimeMs The response time, ignored in non-successful transactions.
@@ -57,6 +59,8 @@ public final class ResultTracker {
 		try {
 			switch (finishingState) {
 				case FAILED:
+					responseTimeSum.addAndGet(responseTimeMs);
+					responseTimeLogCount.incrementAndGet();
 					invalidTransactionsPerMeasurementInterval.incrementAndGet();
 					invalidTransactionsTotal.incrementAndGet();
 					break;
@@ -64,6 +68,11 @@ public final class ResultTracker {
 					droppedTransactionsPerMeasurementInterval.incrementAndGet();
 					droppedTransactionsTotal.incrementAndGet();
 					break;
+				case TIMEOUT:
+					responseTimeSum.addAndGet(responseTimeMs);
+					responseTimeLogCount.incrementAndGet();
+					timeoutTransactionsPerMeasurementInterval.incrementAndGet();
+					timeoutTransactionsTotal.incrementAndGet();
 				default:
 					responseTimeSum.addAndGet(responseTimeMs);
 					responseTimeLogCount.incrementAndGet();
@@ -75,7 +84,7 @@ public final class ResultTracker {
 			transactionLock.unlock();
 		}
 	}
-	
+
 	/**
 	 * Resets the validity tracker.
 	 */
@@ -94,8 +103,8 @@ public final class ResultTracker {
 			transactionLock.unlock();
 		}
 	}
-	
-	
+
+
 	/**
 	 * Returns the total invalid transaction counter since initialization or the last call of {@link #reset()}.
 	 * @return The total invalid transaction counter.
@@ -110,7 +119,22 @@ public final class ResultTracker {
 		}
 		return invTrans;
 	}
-	
+
+	/**
+	 * Returns the total timed out transaction counter since initialization or the last call of {@link #reset()}.
+	 * @return The total timed out transaction counter.
+	 */
+	public long getTotalTimeoutTransactionCount() {
+		long timeoutTrans;
+		transactionLock.lock();
+		try {
+			timeoutTrans = timeoutTransactionsTotal.get();
+		} finally {
+			transactionLock.unlock();
+		}
+		return timeoutTrans;
+	}
+
 	/**
 	 * Returns the total successful transaction counter since initialization or the last call of {@link #reset()}.
 	 * @return The total successful transaction counter.
@@ -125,7 +149,7 @@ public final class ResultTracker {
 		}
 		return sucTrans;
 	}
-	
+
 	/**
 	 * Returns the total dropped transaction counter since initialization or the last call of {@link #reset()}.
 	 * @return The total dropped transaction counter.
@@ -140,13 +164,13 @@ public final class ResultTracker {
 		}
 		return dropTrans;
 	}
-	
+
 	/**
 	 * Returns the average response time for all recently logged results in seconds.
 	 * Clears the result storage for new results.
 	 * @return The average response time in seconds.
 	 */
-	private double getAverageResponseTimeInS() {
+	private double getAverageResponseTimeInSAndReset() {
 		long avgResponseTimeMs;
 			if (responseTimeLogCount.get() == 0) {
 				avgResponseTimeMs = 0;
@@ -155,21 +179,22 @@ public final class ResultTracker {
 			}
 		return ((double) avgResponseTimeMs) / 1000.0;
 	}
-	
+
 	public IntervalResult retreiveIntervalResultAndReset() {
 		IntervalResult result = new IntervalResult();
 		transactionLock.lock();
 		try {
 			result.droppedTransactions = droppedTransactionsPerMeasurementInterval.getAndSet(0);
 			result.failedTransactions = invalidTransactionsPerMeasurementInterval.getAndSet(0);
+			result.timeoutTransactions = timeoutTransactionsPerMeasurementInterval.getAndSet(0);
 			result.successfulTransactions = successfulTransactionsPerMeasurementInterval.getAndSet(0);
-			result.averageResponseTimeInS = getAverageResponseTimeInS();
+			result.averageResponseTimeInS = getAverageResponseTimeInSAndReset();
 		} finally {
 			transactionLock.unlock();
 		}
 		return result;
 	}
-	
+
 	/**
 	 * States that a transaction may have upon finishing.
 	 * @author Joakim von Kistowski
@@ -185,24 +210,29 @@ public final class ResultTracker {
 		 */
 		FAILED,
 		/**
+		 * Transaction timed out.
+		 */
+		TIMEOUT,
+		/**
 		 * Transaction was dropped and never executed.
 		 */
 		DROPPED;
 	}
-	
+
 	/**
 	 * Result of a measurement interval.
 	 * @author Joakim von Kistowski
 	 */
 	public static class IntervalResult {
-		
+
 		private long droppedTransactions = 0;
 		private long failedTransactions = 0;
+		private long timeoutTransactions = 0;
 		private long successfulTransactions = 0;
 		private double averageResponseTimeInS = 0.0;
-		
+
 		private IntervalResult() { }
-		
+
 		/**
 		 * Returns the number of dropped transactions.
 		 * @return The number of dropped transactions.
@@ -217,6 +247,13 @@ public final class ResultTracker {
 		 */
 		public long getFailedTransactions() {
 			return failedTransactions;
+		}
+		/**
+		 * Returns the number of timed out transactions.
+		 * @return The number of timed out transactions.
+		 */
+		public long getTimeoutTransactions() {
+			return timeoutTransactions;
 		}
 
 		/**

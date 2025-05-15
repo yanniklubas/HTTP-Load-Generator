@@ -34,7 +34,7 @@ import tools.descartes.dlim.httploadgenerator.runner.IRunnerConstants;
  * class triggers the process method of the selected load generator class when
  * the starting message of the director is received. The main task of this class
  * is the communication with the director on the controller system.
- * 
+ *
  * @author Joakim von Kistowski, Maximilian Deffner
  *
  */
@@ -45,7 +45,7 @@ public abstract class AbstractLoadGenerator extends Thread {
 	 * as the LUA engine supports reading it from storage way better than reading from memory.
 	 */
 	private static final String TMP_SCRIPT_PATH = System.getProperty("java.io.tmpdir") + "/http_calls.lua";
-	
+
 	/** The constant Log4j2 logging instance. */
 	private static final Logger LOG = Logger.getLogger(AbstractLoadGenerator.class.getName());
 
@@ -65,12 +65,12 @@ public abstract class AbstractLoadGenerator extends Thread {
 	private PrintWriter out;
 
 	private int timeout = -1;
-	
+
 	/**
 	 * Constant command String to indicate that a load profile is being sent via
 	 * network. E.g. "dlim" for arrival rate tuples and "timestaps" for request
 	 * time stamps.
-	 * 
+	 *
 	 * @return The constant command.
 	 */
 	protected abstract String loadProfileCommand();
@@ -99,7 +99,7 @@ public abstract class AbstractLoadGenerator extends Thread {
 
 	/**
 	 * Creating new instance of the abstract load generator.
-	 * 
+	 *
 	 * @param director Socket for communicating with the director.
 	 * @param in Input reader for reading inputs from the director.
 	 * @param out Writer for writing back to the director.
@@ -113,7 +113,7 @@ public abstract class AbstractLoadGenerator extends Thread {
 
 	/**
 	 * Accepting new client for connection to the socket.
-	 * 
+	 *
 	 * @param server
 	 *            Server socket.
 	 * @return A container with the network streams.
@@ -185,7 +185,7 @@ public abstract class AbstractLoadGenerator extends Thread {
 
 	/**
 	 * Receiving the load profile transferred by the director.
-	 * 
+	 *
 	 * @param in
 	 *            Input reader.
 	 * @param header
@@ -214,7 +214,7 @@ public abstract class AbstractLoadGenerator extends Thread {
 	/**
 	 * Start execution of the benchmark with the transaction name, seed and
 	 * random batch time transferred by the director.
-	 * 
+	 *
 	 * @param params
 	 *            String array of the parameters received via network.
 	 *            Expected message:
@@ -242,10 +242,10 @@ public abstract class AbstractLoadGenerator extends Thread {
 		process(randomBatchTimes, seed, warmupDurationS, warmupLoad, warmupPauseS, randomizeUsers);
 		out.println(IRunnerConstants.DONE_KEY);
 	}
-	
+
 	/**
 	 * Sending error message to the director.
-	 * 
+	 *
 	 * @param message
 	 *            Error message.
 	 */
@@ -283,7 +283,7 @@ public abstract class AbstractLoadGenerator extends Thread {
 
 	/**
 	 * Sending results to the director after every interval.
-	 * 
+	 *
 	 * @param targettime
 	 *            time stamp of the arrival rate tuples
 	 * @param loadintensity
@@ -294,21 +294,24 @@ public abstract class AbstractLoadGenerator extends Thread {
 	 * 			  average response time
 	 * @param invalidTransactionCount
 	 * 			  Count of invalid transactions for the measurement interval.
+	 * @param timeoutTransactionCount
+	 * 			  Count of timed out transactions for the measurement interval.
 	 * * @param droppedTransactionCount
 	 * 			  Count of dropped transactions for the measurement interval.
 	 * @param actualtime
 	 *            actual time
 	 */
 	protected void sendToDirector(double targettime, int loadintensity, long throughput,
-				double avgResponseTime, long invalidTransactionCount, long droppedTransactionCount, double actualtime) {
+				double avgResponseTime, long invalidTransactionCount, long timeoutTransactionCount,
+				long droppedTransactionCount, double actualtime) {
 		out.println("" + targettime + "," + loadintensity + "," + throughput
 				+ "," + avgResponseTime + "," + invalidTransactionCount + ","
-				+ droppedTransactionCount + "," + actualtime);
+				+ timeoutTransactionCount + "," + droppedTransactionCount + "," + actualtime);
 	}
 
 	/**
 	 * Container for network streams.
-	 * 
+	 *
 	 * @author Joakim von Kistowski
 	 *
 	 */
@@ -317,12 +320,12 @@ public abstract class AbstractLoadGenerator extends Thread {
 		private BufferedReader in;
 		private PrintWriter out;
 	}
-	
+
 	//Receives the script and writes it to the temp dir.
 	private void receiveScript(BufferedReader br) throws IOException {
 		try (PrintWriter tmpScriptFileWriter = new PrintWriter(TMP_SCRIPT_PATH)) {
 			String line;
-			while ((line = br.readLine()) != null) { 
+			while ((line = br.readLine()) != null) {
 				if (line.equals(IRunnerConstants.SCRIPT_TERM_KEY)) {
 					break;
 				} else {
@@ -330,9 +333,9 @@ public abstract class AbstractLoadGenerator extends Thread {
 				}
 			}
 		}
-		
+
 	}
-	
+
 	/**
 	 * The path of the script file for the load generator.
 	 * (i.e. the tmp path were the network received script has been stored.
@@ -341,7 +344,7 @@ public abstract class AbstractLoadGenerator extends Thread {
 	protected String getScriptPath() {
 		return TMP_SCRIPT_PATH;
 	}
-	
+
 	/**
 	 * Get the http url connection read timout.
 	 * @return The timout.

@@ -38,7 +38,7 @@ import tools.descartes.dlim.httploadgenerator.transaction.TransactionQueueSingle
  * AbstractLoadGenerator for receiving and interpreting the transferred arrival
  * rates. It triggers a thread pool of workers for executing the transaction.
  * The number of executions of the transactions is monitored.
- * 
+ *
  * @author Joakim von Kistowski, Maximilian Deffner
  *
  */
@@ -65,7 +65,7 @@ public class ArrivalRateTupleLoadGenerator extends AbstractLoadGenerator {
 
 	/**
 	 * New instance of the class.
-	 * 
+	 *
 	 * @param director
 	 *            Socket for the communication with the director
 	 * @param in
@@ -117,25 +117,25 @@ public class ArrivalRateTupleLoadGenerator extends AbstractLoadGenerator {
 			 * of the time between two arrival rate tuples.
 			 */
 			int defaultMeanWaitTime = Math.min(10, (int) (arrRates.get(0).getTimeStamp() * 1000) / 10);
-			
+
 			clearResultTracker();
-			
+
 			//Warmup, if not skipped
 			if (warmupDurationS > 0 && warmupLoadIntensity >= 1) {
-				long warmupStart = System.currentTimeMillis(); 
+				long warmupStart = System.currentTimeMillis();
 				int arrivalRate = (int) warmupLoadIntensity;
 				for (long targetTime = 1000;
 						targetTime <= warmupDurationS * 1000;
 						targetTime += 1000) {
 					long currentTime = System.currentTimeMillis() - warmupStart;
-					
+
 					currentTime = blockingScheduleTransactionBatchesForInterval(arrivalRate,
 							warmupStart, currentTime, targetTime, defaultMeanWaitTime, randomBatchTimes);
 					//warmup has target times <= 0
 					sendBatchDataToDirector((targetTime / 1000) - warmupDurationS - warmupPauseS,
 							arrivalRate, ((double) currentTime) / 1000);
 				}
-				
+
 				//pause after warmup
 				long pauseStartTime = System.currentTimeMillis();
 				for (long targetTime = 1000;
@@ -148,7 +148,7 @@ public class ArrivalRateTupleLoadGenerator extends AbstractLoadGenerator {
 							0.0);
 				}
 			}
-			
+
 			clearResultTracker();
 			long timeZero = System.currentTimeMillis();
 			double nextTimeStamp = 0;
@@ -159,7 +159,7 @@ public class ArrivalRateTupleLoadGenerator extends AbstractLoadGenerator {
 				// set target arrival rate and next time target
 				int targetArrivalsInInterval = (int) t.getArrivalRate();
 				long targetTime = (long) (1000.0 * t.getTimeStamp());
-				
+
 				currentTime = blockingScheduleTransactionBatchesForInterval(targetArrivalsInInterval,
 						timeZero, currentTime, targetTime, defaultMeanWaitTime, randomBatchTimes);
 
@@ -224,7 +224,7 @@ public class ArrivalRateTupleLoadGenerator extends AbstractLoadGenerator {
 		}
 		return currentTime;
 	}
-	
+
 	/**
 	 * Schedules a batch. Returns the number of placed transactions.
 	 * @param targetTime The target time at which the current load intensity target is to be met.
@@ -240,7 +240,7 @@ public class ArrivalRateTupleLoadGenerator extends AbstractLoadGenerator {
 		batch.executeBatch(executor);
 		return batch.getBatchSize();
 	}
-	
+
 	/**
 	 * Calculates the mean wait time. Effectively uses default mean wait time and guards for some edge cases.
 	 * Ensures that it is not not too short for low loads.
@@ -254,11 +254,11 @@ public class ArrivalRateTupleLoadGenerator extends AbstractLoadGenerator {
 			int targetArrivalsInInterval) {
 		long meanWaitTime = defaultMeanWaitTime;
 		if (targetArrivalsInInterval < 50 && targetArrivalsInInterval > 1) {
-			meanWaitTime = (targetTime - currentTime) / (targetArrivalsInInterval + 1); 
+			meanWaitTime = (targetTime - currentTime) / (targetArrivalsInInterval + 1);
 		}
 		return meanWaitTime;
 	}
-	
+
 	/**
 	 * Returns a waiting time to wait after batch dispatch.
 	 * @param r The random generator
@@ -277,10 +277,10 @@ public class ArrivalRateTupleLoadGenerator extends AbstractLoadGenerator {
 		randomWaitTime = Math.min(1.5 * meanWaitTime, randomWaitTime);
 		return (long) randomWaitTime;
 	}
-	
+
 	/**
 	 * Sending results to the director after every interval.
-	 * 
+	 *
 	 * @param targettime Target time when load was supposed to be executed.
 	 * @param loadintensity The load intensity to be reached.
 	 * @param actualtime The actual time of execution.
@@ -289,9 +289,9 @@ public class ArrivalRateTupleLoadGenerator extends AbstractLoadGenerator {
 		ResultTracker.IntervalResult result = ResultTracker.TRACKER.retreiveIntervalResultAndReset();
 		sendToDirector(targettime, loadintensity, result.getSuccessfulTransactions(),
 				result.getAverageResponseTimeInS(), result.getFailedTransactions(),
-				result.getDroppedTransactions(), actualtime);
+				result.getTimeoutTransactions(), result.getDroppedTransactions(), actualtime);
 	}
-	
+
 	/**
 	 * Clear the result tracker. Use at beginning of the measurement phase.
 	 */

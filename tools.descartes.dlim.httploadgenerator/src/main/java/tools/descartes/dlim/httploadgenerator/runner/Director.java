@@ -38,11 +38,11 @@ import tools.descartes.dlim.httploadgenerator.power.IPowerCommunicator;
 public class Director extends Thread {
 
 	private static final Logger LOG = Logger.getLogger(Director.class.getName());
-	
+
 	private static int seed = 5;
 
 	private List<LoadGeneratorCommunicator> communicators;
-	
+
 	/**
 	 * Execute the director with the given parameters.
 	 * Parameters may be null. Director asks the user for null parameters if they are required.
@@ -68,7 +68,7 @@ public class Director extends Thread {
 			boolean randomizeUsers, double warmupRate, int warmupDurationS,
 			int warmupPauseS, String powerCommunicatorClassName) {
 			List<IPowerCommunicator> powerCommunicators = new LinkedList<>();
-			
+
 			//Load Profile
 			File file = null;
 			if (profilePath != null) {
@@ -83,7 +83,7 @@ public class Director extends Thread {
 			if (powerAddresses != null && !powerAddresses.isEmpty()) {
 				powerIPs = powerAddresses.split(",");
 			}
-			
+
 			//Power measurement
 			if (powerCommunicatorClassName != null && !powerCommunicatorClassName.trim().isEmpty()
 					&& powerIPs != null && !(powerIPs.length == 0)) {
@@ -108,11 +108,11 @@ public class Director extends Thread {
 				randomBatchTimes = false;
 				LOG.info("Using equi-distant non-random inter batch times.");
 			}
-			
+
 			LOG.info("Load Generator Thread Count set to " + threadCount);
 			LOG.info("URL connection timout set to " + urlTimeout + " ms");
-			
-			
+
+
 			//Script Path
 			String scriptPathRead = scriptPath.trim();
 			LOG.info("Using Lua Script: " + scriptPathRead);
@@ -187,19 +187,19 @@ public class Director extends Thread {
 			if (timeout > 0) {
 				LOG.info("URL connection timeout sent to Load Generator(s): " + timeout);
 			}
-			
+
 			communicators.parallelStream().forEach(c-> c.sendLUAScript(scriptPath));
 			LOG.info("Contents of script sent to Load Generator: " + scriptPath);
-			
+
 			String parentPath = file.getParent();
 			if (parentPath == null || parentPath.isEmpty()) {
 				parentPath = ".";
 			}
 			PrintWriter writer = new PrintWriter(parentPath + "/" + outName);
 			writer.print("Target Time,Load Intensity,Successful Transactions,"
-			 + "Failed Transactions,Dropped Transactions,Avg Response Time,Final Batch Dispatch Time");
+			 + "Failed Transactions,Timed Out Transactions,Dropped Transactions,Avg Response Time,Final Batch Dispatch Time");
 			powerCommunicators.stream().forEachOrdered(pc -> writer.print(",Watts(" + pc.getCommunicatorName() + ")"));
-			
+
 			LOG.info("Starting Load Generation");
 
 			//setup initial run Variables
@@ -222,7 +222,7 @@ public class Director extends Thread {
 			if (warmupRate < 1 || warmupDurationS <= 0) {
 				writer.println("," + timeZeroString);
 			}
-			
+
 			//get Data from LoadGenerator
 			IntervalResult result;
 			while (!(result = collectResultRound()).isMeasurementConcluded()) {
@@ -251,7 +251,7 @@ public class Director extends Thread {
 					+ "Consult \"java -jar ... director --help\" for the necessary command line switches.");
 		}
 	}
-	
+
 	private static void initializePowerCommunicators(List<IPowerCommunicator> pcList,
 			String pcClassName, String[] addresses) {
 		for (String address : addresses) {
@@ -261,7 +261,7 @@ public class Director extends Thread {
 				if (host.length > 1) {
 					port = Integer.parseInt(host[1].trim());
 				}
-				
+
 				try {
 					Class<? extends IPowerCommunicator> pcClass
 						= Class.forName(pcClassName.trim()).asSubclass(IPowerCommunicator.class);
@@ -282,10 +282,10 @@ public class Director extends Thread {
 				}
 			}
 		}
-		
-		
+
+
 	}
-	
+
 	/**
 	 * Collects one iteration of the results, aggregates them and returns them.
 	 * {@link IntervalResult#isMeasurementConcluded()} is false if more results are expected in the future.
@@ -300,6 +300,7 @@ public class Director extends Thread {
 		int loadIntensity = 0;
 		int successfulTransactions = 0;
 		int failedTransactions = 0;
+		int timeoutTransactions = 0;
 		int droppedTransactions = 0;
 		ArrayList<Double> responseTimes = new ArrayList<Double>();
 		ArrayList<Double> finalBatchTimes = new ArrayList<Double>();
@@ -330,15 +331,16 @@ public class Director extends Thread {
 					successfulTransactions += Integer.parseInt(tokens[2].trim());
 					responseTimes.add(Double.parseDouble(tokens[3].trim()));
 					failedTransactions += Integer.parseInt(tokens[4].trim());
-					droppedTransactions += Integer.parseInt(tokens[5].trim());
-					finalBatchTimes.add(Double.parseDouble(tokens[6].trim()));
+					timeoutTransactions += Integer.parseInt(tokens[5].trim());
+					droppedTransactions += Integer.parseInt(tokens[6].trim());
+					finalBatchTimes.add(Double.parseDouble(tokens[7].trim()));
 				}
 			}
 		}
 		double avgResponseTime = responseTimes.stream().mapToDouble(d -> d.doubleValue()).average().getAsDouble();
 		double finalBatchTime = finalBatchTimes.stream().mapToDouble(d -> d.doubleValue()).max().getAsDouble();
 		return new IntervalResult(targetTime, loadIntensity, successfulTransactions, failedTransactions,
-				droppedTransactions, avgResponseTime, finalBatchTime);
+				timeoutTransactions, droppedTransactions, avgResponseTime, finalBatchTime);
 	}
 
 	private void logState(IntervalResult result, List<IPowerCommunicator> powerCommunicators,
@@ -355,13 +357,14 @@ public class Director extends Thread {
 				+ "; Load Intensity = " + result.getLoadIntensity()
 				+ "; #Success = " + result.getSuccessfulTransactions()
 				+ "; #Failed = " + result.getFailedTransactions()
+				+ "; #Timeout = " + result.getTimeoutTransactions()
 				+ "; #Dropped = " + result.getDroppedTransactions());
 		//warmup has target times <= 0, ignore it
 		if (result.getTargetTime() > 0) {
 			writer.print(result.getTargetTime() + "," + result.getLoadIntensity() + ","
 					+ result.getSuccessfulTransactions() + "," + result.getFailedTransactions() + ","
-					+ result.getDroppedTransactions() + "," + result.getAvgResponseTime() + ","
-					+ result.getFinalBatchTime());
+					+ result.getTimeoutTransactions() + "," + result.getDroppedTransactions() + ","
+					+ result.getAvgResponseTime() + "," + result.getFinalBatchTime());
 			if (powers != null && !powers.isEmpty()) {
 				powers.stream().forEachOrdered(p -> writer.print("," + p));
 			}
