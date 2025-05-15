@@ -25,22 +25,24 @@ import java.util.concurrent.Semaphore;
 import java.util.logging.Logger;
 
 /**
- * Pool of input stateful generators to be assigned to the load generation transactions.
+ * Pool of input stateful generators to be assigned to the load generation
+ * transactions.
+ * 
  * @author Joakim von Kistowski
  *
  */
 public final class HTTPInputGeneratorPool {
 
 	private static final Logger LOG = Logger.getLogger(HTTPInputGeneratorPool.class.getName());
-	
+
 	private static HTTPInputGeneratorPool pool = null;
-	
+
 	private Random random;
 	private PoolMode mode;
 	private BlockingQueue<HTTPInputGenerator> queue;
-	private ConcurrentHashMap<Integer,HTTPInputGenerator> map;
+	private ConcurrentHashMap<Integer, HTTPInputGenerator> map;
 	private Semaphore mapAccessControlSemaphore;
-	
+
 	private HTTPInputGeneratorPool(PoolMode mode, String luaScriptPath, int threadCount, int timeout, int randomSeed) {
 		this.mode = mode;
 		queue = new LinkedBlockingQueue<>();
@@ -55,7 +57,7 @@ public final class HTTPInputGeneratorPool {
 		if (!script.exists()) {
 			LOG.severe("Lua script does not exist at: " + luaScriptPath);
 		}
-		 // We place as many input generators as threads in the pool.
+		// We place as many input generators as threads in the pool.
 		for (int i = 0; i < threadCount; i++) {
 			addInputGenerator(new HTTPInputGenerator(i, script, i, timeout));
 		}
@@ -65,7 +67,7 @@ public final class HTTPInputGeneratorPool {
 			LOG.info("Created pool of " + map.size() + " users (LUA contexts, HTTP input generators).");
 		}
 	}
-	
+
 	private void addInputGenerator(HTTPInputGenerator generator) {
 		if (mode.equals(PoolMode.QUEUE)) {
 			try {
@@ -77,9 +79,10 @@ public final class HTTPInputGeneratorPool {
 			map.put(generator.getId(), generator);
 		}
 	}
-	
+
 	/**
 	 * Get the pool. Must have been initialized.
+	 * 
 	 * @return The pool singleton. Null if uninitialized.
 	 */
 	public static HTTPInputGeneratorPool getPool() {
@@ -89,19 +92,23 @@ public final class HTTPInputGeneratorPool {
 		}
 		return pool;
 	}
-	
+
 	/**
 	 * Initializes the pool (deleting an old one if it exists).
+	 * 
 	 * @param luaScriptPath The path of the Lua script.
-	 * @param threadCount The number of threads that will be used to access the pool.
-	 * @param timeout The http url connection timeout.
+	 * @param threadCount   The number of threads that will be used to access the
+	 *                      pool.
+	 * @param timeout       The http url connection timeout.
 	 */
-	public static void initializePool(PoolMode mode, String luaScriptPath, int threadCount, int timeout, int randomSeed) {
+	public static void initializePool(PoolMode mode, String luaScriptPath, int threadCount, int timeout,
+			int randomSeed) {
 		pool = new HTTPInputGeneratorPool(mode, luaScriptPath, threadCount, timeout, randomSeed);
 	}
-	
+
 	/**
 	 * Places an HTTPInputGenerator back into the pool.
+	 * 
 	 * @param generator The generator to place in the pool.
 	 */
 	public void releaseBackToPool(HTTPInputGenerator generator) {
@@ -115,11 +122,13 @@ public final class HTTPInputGeneratorPool {
 			map.put(generator.getId(), generator);
 			mapAccessControlSemaphore.release();
 		}
-		
+
 	}
-	
+
 	/**
-	 * Retrieves an HTTPInputGenerator from the pool. Don't forget to but it back after use.
+	 * Retrieves an HTTPInputGenerator from the pool. Don't forget to but it back
+	 * after use.
+	 * 
 	 * @return The generator to use.
 	 */
 	public HTTPInputGenerator takeFromPool() {
@@ -137,11 +146,11 @@ public final class HTTPInputGeneratorPool {
 			} catch (InterruptedException e) {
 				LOG.severe("Interrupted acquiring access for retreiving generator from pool.");
 			}
-			
+
 		}
 		return generator;
 	}
-	
+
 	private synchronized HTTPInputGenerator takeRandomFromMapWithAccess() {
 		if (map.size() == 0) {
 			LOG.severe("No HTTPInputGenerator available. It should have been available as access was granted.");
@@ -164,9 +173,9 @@ public final class HTTPInputGeneratorPool {
 		LOG.severe("No HTTPInputGenerator available. Entry in pool was null but access was granted.");
 		return null;
 	}
-	
+
 	public static enum PoolMode {
 		QUEUE, RANDOM
 	}
-	
+
 }
