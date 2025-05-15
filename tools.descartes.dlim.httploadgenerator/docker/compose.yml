@@ -14,7 +14,7 @@ services:
     extra_hosts:
       - "host.docker.internal:host-gateway"
     volumes:
-      - "${YAML_FILE?No yaml path specified}:/opt/load_generator.yml:ro"
+      - "${LUA_FILE?No yaml path specified}:/opt/load_generator.yml:ro"
       - "${OUTPUT_DIR?No experiment output directory defined}:/opt/loadgenerator:rw"
       - "${PROFILE?No profile defined}:/opt/profile.csv"
     depends_on:
