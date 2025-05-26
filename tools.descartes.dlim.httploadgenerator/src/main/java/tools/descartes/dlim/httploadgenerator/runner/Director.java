@@ -338,13 +338,15 @@ public class Director extends Thread {
 					timeoutTransactions += Integer.parseInt(tokens[5].trim());
 					droppedTransactions += Integer.parseInt(tokens[6].trim());
 					finalBatchTimes.add(Double.parseDouble(tokens[7].trim()));
-					String[] elements = tokens[8].trim().split("\\$");
-					for (String element: elements) {
-						String[] props = element.trim().split(";");
-						int requestNum = Integer.parseInt(props[0].trim());
-						double responseTime = Double.parseDouble(props[3].trim());
-						double transactionStartTime = Double.parseDouble(props[5].trim());
-						requestResults.add(new PerRequestIntervalResult(targetTime, requestNum, props[1], props[2], responseTime, props[4], transactionStartTime));
+					if(tokens.length == 9) {
+						String[] elements = tokens[8].trim().split("\\$");
+						for (String element: elements) {
+							String[] props = element.trim().split(";");
+							int requestNum = Integer.parseInt(props[0].trim());
+							double responseTime = Double.parseDouble(props[3].trim());
+							double transactionStartTime = Double.parseDouble(props[5].trim());
+							requestResults.add(new PerRequestIntervalResult(targetTime, requestNum, props[1], props[2], responseTime, props[4], transactionStartTime));
+						}
 					}
 				}
 			}
