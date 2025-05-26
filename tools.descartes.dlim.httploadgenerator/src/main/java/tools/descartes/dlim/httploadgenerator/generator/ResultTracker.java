@@ -204,7 +204,7 @@ public final class ResultTracker {
 			while ((element = this.perRequestIntervalResults.poll()) != null) {
 				requestResults.add(element);
 			}
-			result.setRequestResults(requestResults);
+			result.requestResults = requestResults;
 		} finally {
 			transactionLock.unlock();
 		}
@@ -293,10 +293,6 @@ public final class ResultTracker {
 
 		public ArrayList<HTTPTransactionResult> getRequestResults() {
 			return requestResults;
-		}
-
-		public void setRequestResults(ArrayList<HTTPTransactionResult> requestResults) {
-			this.requestResults = requestResults;
 		}
 	}
 }

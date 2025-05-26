@@ -26,11 +26,7 @@ import org.eclipse.jetty.client.api.Request;
 
 import tools.descartes.dlim.httploadgenerator.generator.ResultTracker;
 import tools.descartes.dlim.httploadgenerator.generator.ResultTracker.TransactionState;
-import tools.descartes.dlim.httploadgenerator.runner.PerRequestIntervalResult;
 import tools.descartes.dlim.httploadgenerator.transaction.Transaction;
-import tools.descartes.dlim.httploadgenerator.transaction.TransactionDroppedException;
-import tools.descartes.dlim.httploadgenerator.transaction.TransactionInvalidException;
-import tools.descartes.dlim.httploadgenerator.transaction.TransactionTimeoutException;
 import tools.descartes.dlim.httploadgenerator.transaction.TransactionQueueSingleton;
 
 /**

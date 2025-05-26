@@ -310,7 +310,7 @@ public abstract class AbstractLoadGenerator extends Thread {
 		out.println("" + targettime + "," + loadintensity + "," + throughput
 				+ "," + avgResponseTime + "," + invalidTransactionCount + ","
 				+ timeoutTransactionCount + "," + droppedTransactionCount + "," + actualtime + "," + requestResults.stream().map(result -> {
-				return result.getRequestNum() + ";\"" + result.getRequestURI() + "\";" + result.getMethod() + ";" + result.getResponseTime() + ";" + result.getTransactionState().toString() + ";" + result.getTransactionTargetStartTime();
+				return result.getRequestNum() + ";\"" + result.getRequestURI() + "\";" + result.getMethod() + ";" + ((double) result.getResponseTime() / 1000.0)+ ";" + result.getTransactionState().toString() + ";" + result.getTransactionTargetStartTime();
 			}).collect(Collectors.joining("$")));
 	}
 
