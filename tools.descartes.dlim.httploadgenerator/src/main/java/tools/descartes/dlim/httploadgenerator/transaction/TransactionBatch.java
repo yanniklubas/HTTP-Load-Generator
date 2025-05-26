@@ -21,17 +21,18 @@ import tools.descartes.dlim.httploadgenerator.http.HTTPTransaction;
 
 /**
  * A batch of transactions to be scheduled.
- * 
+ *
  * @author Joakim von Kistowski
  *
  */
 public class TransactionBatch {
 
 	private int size;
+	private long targetTime;
 
 	/**
 	 * Create a new transaction batch.
-	 * 
+	 *
 	 * @param targetTime
 	 *            Time when to schedule the batch.
 	 * @param currentTime
@@ -52,7 +53,7 @@ public class TransactionBatch {
 
 	/**
 	 * Execute the current batch by placing all transactions in the executor.
-	 * 
+	 *
 	 * @param executor
 	 *            The thread pool to execute the transactions.
 	 */
@@ -66,13 +67,14 @@ public class TransactionBatch {
 				transaction = new HTTPTransaction();
 			}
 			transaction.setStartTime(startTime);
+			transaction.setTargetTime(targetTime);
 			executor.execute(transaction);
 		}
 	}
 
 	/**
 	 * Number of transactions in Batch.
-	 * 
+	 *
 	 * @return Number of transactions.
 	 */
 	public int getBatchSize() {

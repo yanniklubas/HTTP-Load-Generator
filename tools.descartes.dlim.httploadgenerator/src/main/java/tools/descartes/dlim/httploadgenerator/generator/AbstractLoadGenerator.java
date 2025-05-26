@@ -22,9 +22,12 @@ import java.io.InputStreamReader;
 import java.io.PrintWriter;
 import java.net.ServerSocket;
 import java.net.Socket;
+import java.util.ArrayList;
 import java.util.logging.Level;
 import java.util.logging.Logger;
+import java.util.stream.Collectors;
 
+import tools.descartes.dlim.httploadgenerator.http.HTTPTransaction.HTTPTransactionResult;
 import tools.descartes.dlim.httploadgenerator.runner.IRunnerConstants;
 
 /**
@@ -303,10 +306,12 @@ public abstract class AbstractLoadGenerator extends Thread {
 	 */
 	protected void sendToDirector(double targettime, int loadintensity, long throughput,
 				double avgResponseTime, long invalidTransactionCount, long timeoutTransactionCount,
-				long droppedTransactionCount, double actualtime) {
+				long droppedTransactionCount, double actualtime, ArrayList<HTTPTransactionResult> requestResults) {
 		out.println("" + targettime + "," + loadintensity + "," + throughput
 				+ "," + avgResponseTime + "," + invalidTransactionCount + ","
-				+ timeoutTransactionCount + "," + droppedTransactionCount + "," + actualtime);
+				+ timeoutTransactionCount + "," + droppedTransactionCount + "," + actualtime + "," + requestResults.stream().map(result -> {
+				return result.getRequestNum() + ";\"" + result.getRequestURI() + "\";" + result.getMethod() + ";" + result.getResponseTime() + ";" + result.getTransactionState().toString() + ";" + result.getTransactionTargetStartTime();
+			}).collect(Collectors.joining("$")));
 	}
 
 	/**

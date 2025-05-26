@@ -25,6 +25,8 @@ import org.eclipse.jetty.client.api.ContentResponse;
 import org.eclipse.jetty.client.api.Request;
 
 import tools.descartes.dlim.httploadgenerator.generator.ResultTracker;
+import tools.descartes.dlim.httploadgenerator.generator.ResultTracker.TransactionState;
+import tools.descartes.dlim.httploadgenerator.runner.PerRequestIntervalResult;
 import tools.descartes.dlim.httploadgenerator.transaction.Transaction;
 import tools.descartes.dlim.httploadgenerator.transaction.TransactionDroppedException;
 import tools.descartes.dlim.httploadgenerator.transaction.TransactionInvalidException;
@@ -52,13 +54,16 @@ public class HTTPTransaction extends Transaction {
 	 * @param generator The input generator to use.
 	 * @return Response time in milliseconds.
 	 */
-	public long process(HTTPInputGenerator generator) throws TransactionDroppedException, TransactionInvalidException, TransactionTimeoutException {
+	public HTTPTransactionResult process(HTTPInputGenerator generator) {
 		long processStartTime = System.currentTimeMillis();
+		int requestNum = generator.getCurrentCallNum();
 		if (generator.getTimeout() > 0 && processStartTime - getStartTime() > generator.getTimeout()) {
-			throw new TransactionDroppedException("Wait time in queue too long. "
+			LOG.warning("Wait time in queue too long. "
 					+ String.valueOf(processStartTime - getStartTime())
 					+ " ms passed before transaction was even started.");
+			return new HTTPTransactionResult(this.getTargetTime(), ResultTracker.TransactionState.DROPPED, requestNum);
 		}
+
 		String url = generator.getNextInput().trim();
 		String method = "GET";
 		if (url.startsWith("[")) {
@@ -72,24 +77,34 @@ public class HTTPTransaction extends Transaction {
 		}
 		Request request = generator.initializeHTTPRequest(url, method);
 
+		HTTPTransactionResult result = new HTTPTransactionResult(this.getTargetTime(), ResultTracker.TransactionState.SUCCESS, requestNum);
+		result.setMethod(method);
+		result.setRequestURI(url);
+
 		try {
 			ContentResponse response = request.send();
 			if (response.getStatus() >= 400) {
 				long responseTime = System.currentTimeMillis() - processStartTime;
 				generator.revertLastCall();
 				LOG.log(Level.FINEST, "Received error response code: " + response.getStatus());
-				throw new TransactionInvalidException("Error code: " + response.getStatus(), responseTime);
+				result.setTransactionState(TransactionState.FAILED);
+				result.setResponseTime(responseTime);
+				return result;
 			} else {
 				String responseBody = response.getContentAsString();
 				long responseTime = System.currentTimeMillis() - processStartTime;
 
 				// store result
 				generator.resetHTMLFunctions(responseBody);
-				return responseTime;
+				result.setResponseTime(responseTime);
+				return result;
 			}
 		} catch (TimeoutException e) {
 			generator.revertLastCall();
-			throw new TransactionTimeoutException("TimeoutException: " + e.getMessage());
+			result.setResponseTime(generator.getTimeout());
+			result.setTransactionState(TransactionState.TIMEOUT);
+			LOG.warning("TimeoutException: " + e.getMessage());
+			return result;
 		} catch (ExecutionException e) {
 			long responseTime = System.currentTimeMillis() - processStartTime;
 			if (e.getCause() == null || !(e.getCause() instanceof TimeoutException)) {
@@ -97,35 +112,102 @@ public class HTTPTransaction extends Transaction {
 						"ExecutionException in call for URL: " + url + "; Cause: " + e.getCause().toString());
 			}
 			generator.revertLastCall();
-			throw new TransactionInvalidException("ExecutionException: " + e.getMessage(), responseTime);
+			result.setTransactionState(TransactionState.FAILED);
+			result.setResponseTime(responseTime);
+			return result;
 		} catch (CancellationException e) {
 			long responseTime = System.currentTimeMillis() - processStartTime;
 			LOG.log(Level.SEVERE, "CancellationException: " + url + "; " + e.getMessage());
 			generator.revertLastCall();
-			throw new TransactionInvalidException("CancellationException: " + e.getMessage(), responseTime);
+			result.setTransactionState(TransactionState.FAILED);
+			result.setResponseTime(responseTime);
+			return result;
 		} catch (InterruptedException e) {
 			long responseTime = System.currentTimeMillis() - processStartTime;
 			LOG.log(Level.SEVERE, "InterruptedException: " + e.getMessage());
 			generator.revertLastCall();
-			throw new TransactionInvalidException("InterruptedException: " + e.getMessage(), responseTime);
+			result.setTransactionState(TransactionState.FAILED);
+			result.setResponseTime(responseTime);
+			return result;
 		}
 	}
 
 	@Override
 	public void run() {
 		HTTPInputGenerator generator = HTTPInputGeneratorPool.getPool().takeFromPool();
-		try {
-			long responseTime = this.process(generator);
-			ResultTracker.TRACKER.logTransaction(responseTime, ResultTracker.TransactionState.SUCCESS);
-		} catch (TransactionDroppedException e) {
-			ResultTracker.TRACKER.logTransaction(0, ResultTracker.TransactionState.DROPPED);
-		} catch (TransactionInvalidException e) {
-			ResultTracker.TRACKER.logTransaction(e.responseTime, ResultTracker.TransactionState.FAILED);
-		} catch (TransactionTimeoutException e) {
-			ResultTracker.TRACKER.logTransaction(generator.getTimeout(), ResultTracker.TransactionState.TIMEOUT);
-		}
+		HTTPTransactionResult result = this.process(generator);
+		ResultTracker.TRACKER.logTransaction(result);
+		// } catch (TransactionDroppedException e) {
+		// 	ResultTracker.TRACKER.logTransaction(0, ResultTracker.TransactionState.DROPPED);
+		// } catch (TransactionInvalidException e) {
+		// 	ResultTracker.TRACKER.logTransaction(e.responseTime, ResultTracker.TransactionState.FAILED);
+		// } catch (TransactionTimeoutException e) {
+		// 	ResultTracker.TRACKER.logTransaction(generator.getTimeout(), ResultTracker.TransactionState.TIMEOUT);
+		// }
 		HTTPInputGeneratorPool.getPool().releaseBackToPool(generator);
 		TransactionQueueSingleton transactionQueue = TransactionQueueSingleton.getInstance();
 		transactionQueue.addQueueElement(this);
+	}
+
+	public class HTTPTransactionResult {
+		private long responseTime = 0;
+
+		private String requestURI = "";
+
+		private String method = "";
+
+		private double transactionTargetStartTime;
+
+		private ResultTracker.TransactionState transactionState;
+
+		private int requestNum;
+
+
+
+		public HTTPTransactionResult(double transactionTargetStartTime, ResultTracker.TransactionState transactionState, int requestNum) {
+			this.transactionTargetStartTime = transactionTargetStartTime;
+			this.transactionState = transactionState;
+			this.requestNum = requestNum;
+		}
+
+		public int getRequestNum() {
+			return requestNum;
+		}
+
+		public double getTransactionTargetStartTime() {
+			return transactionTargetStartTime;
+		}
+
+		public ResultTracker.TransactionState getTransactionState() {
+			return transactionState;
+		}
+
+		public void setTransactionState(ResultTracker.TransactionState transactionState) {
+			this.transactionState = transactionState;
+		}
+
+		public long getResponseTime() {
+			return responseTime;
+		}
+
+		public void setResponseTime(long responseTime) {
+			this.responseTime = responseTime;
+		}
+
+		public String getRequestURI() {
+			return requestURI;
+		}
+
+		public void setRequestURI(String requestURI) {
+			this.requestURI = requestURI;
+		}
+
+		public String getMethod() {
+			return method;
+		}
+
+		public void setMethod(String method) {
+			this.method = method;
+		}
 	}
 }

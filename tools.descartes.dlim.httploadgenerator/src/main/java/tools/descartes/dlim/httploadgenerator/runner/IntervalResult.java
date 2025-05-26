@@ -1,4 +1,3 @@
-
 /**
  * Copyright 2018 Joakim von Kistowski
  *
@@ -13,9 +12,12 @@
  * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
  * See the License for the specific language governing permissions and
  * limitations under the License.
- */package tools.descartes.dlim.httploadgenerator.runner;
+ */
+package tools.descartes.dlim.httploadgenerator.runner;
 
- /**
+import java.util.ArrayList;
+
+/**
   * Container for all interval results received by the director.
   * @author Joakim von Kistowski
   *
@@ -31,6 +33,13 @@ public class IntervalResult {
 	private int droppedTransactions;
 	private double finalBatchTime;
 	private boolean measurementConcluded = false;
+
+	private ArrayList<PerRequestIntervalResult> requestIntervalResults = new ArrayList<>();
+
+
+	public ArrayList<PerRequestIntervalResult> getRequestIntervalResults() {
+		return requestIntervalResults;
+	}
 
 	public static IntervalResult createIntervalResultWithMeasurementConcludedFlag() {
 		return new IntervalResult();
@@ -48,7 +57,7 @@ public class IntervalResult {
 	 */
 	public IntervalResult(double targetTime, double loadIntensity, int successfulTransactions,
 			int failedTransactions, int timeoutTransactions, int droppedTransactions,
-			double avgResponseTime, double finalBatchTime) {
+			double avgResponseTime, double finalBatchTime, ArrayList<PerRequestIntervalResult> requestIntervalResults) {
 		this.targetTime = targetTime;
 		this.loadIntensity = loadIntensity;
 		this.successfulTransactions = successfulTransactions;
@@ -58,6 +67,7 @@ public class IntervalResult {
 		this.avgResponseTime = avgResponseTime;
 		this.finalBatchTime = finalBatchTime;
 		this.measurementConcluded = false;
+		this.requestIntervalResults = requestIntervalResults;
 	}
 
 	/**

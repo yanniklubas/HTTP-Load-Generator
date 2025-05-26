@@ -24,12 +24,15 @@ public abstract class Transaction implements Runnable {
 
 	//problemsize for computing problems
 	private static int problemsize = 10000;
-	
+
 	private long startTimeMs = 0;
-	
+
+	// the target time at which this transaction was sent
+	private long targetTime = 0;
+
 	@Override
 	public abstract void run();
-	
+
 	/**
 	 * Setup the transaction.
 	 * @param problemsize Problemsize to compute.
@@ -37,7 +40,7 @@ public abstract class Transaction implements Runnable {
 	public void setup(int problemsize) {
 		Transaction.problemsize = problemsize;
 	}
-	
+
 	/**
 	 * Return the problem size.
 	 * @return The problem size.
@@ -45,7 +48,7 @@ public abstract class Transaction implements Runnable {
 	protected static int getProblemSize() {
 		return problemsize;
 	}
-	
+
 	/**
 	 * Set the start time of the transaction when queuing it into the threadpool.
 	 * This start time may then be used for execution time logging, etc.
@@ -54,7 +57,7 @@ public abstract class Transaction implements Runnable {
 	public void setStartTime(long startTimeMs) {
 		this.startTimeMs = startTimeMs;
 	}
-	
+
 	/**
 	 * Gets the Transaction's start time. The start time is the time at which it was queued
 	 * into the threadpool.
@@ -64,4 +67,20 @@ public abstract class Transaction implements Runnable {
 		return startTimeMs;
 	}
 
+	/**
+	 * Set the target time of the transaction at which it was queued into the threadpool.
+	 * @param targetTime The target time.
+	 */
+	public void setTargetTime(long targetTime) {
+		this.targetTime = targetTime;
+	}
+
+	/**
+	 * Gets the Transaction's start time. The start time is the time at which it was queued
+	 * into the threadpool.
+	 * @return The start time in system milliseconds.
+	 */
+	public long getTargetTime() {
+		return targetTime;
+	}
 }

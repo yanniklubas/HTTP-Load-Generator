@@ -18,7 +18,7 @@ package tools.descartes.dlim.httploadgenerator.runner;
 
 /**
  * Interface IRunnerConstants provides the constants for the director and the load generator.
- * 
+ *
  * @author Joakim von Kistowski, Maximilian Deffner
  *
  */
@@ -38,6 +38,10 @@ public interface IRunnerConstants {
 	 */
 	public static final String DEFAULT_LOG = "default_log.txt";
 	/**
+	 * Default request output log name.
+	 */
+	public static final String DEFAULT_REQUEST_LOG = "request_out.csv";
+	/**
 	 * Default lua script path.
 	 */
 	public static final String DEFAULT_LUA_PATH = "http_calls.lua";
@@ -45,7 +49,7 @@ public interface IRunnerConstants {
 	 * Default number of load generation threads.
 	 */
 	public static final int DEFAULT_THREAD_NUM = 128;
-	
+
 	/**
 	 * The default warmup duration in seconds.
 	 */
@@ -54,7 +58,7 @@ public interface IRunnerConstants {
 	 * The default pause to wait after warmup before starting measurement (in seconds).
 	 */
 	public static final int DEFAULT_WARMUP_PAUSE = 5;
-	
+
 	/** Socket information */
 	/**
 	 * Localhost IP.

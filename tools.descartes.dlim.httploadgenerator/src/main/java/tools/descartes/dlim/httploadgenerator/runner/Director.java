@@ -63,7 +63,7 @@ public class Director extends Thread {
 	 * 		False if they should be taken from a queue in order.
 	 * @param powerCommunicatorClassName Fully qualified class name of the power communicator class.
 	 */
-	public static void executeDirector(String profilePath, String outName, String powerAddresses,
+	public static void executeDirector(String profilePath, String outName, String routName, String powerAddresses,
 			String generators, int randomSeed, int threadCount, int urlTimeout, String scriptPath,
 			boolean randomizeUsers, double warmupRate, int warmupDurationS,
 			int warmupPauseS, String powerCommunicatorClassName) {
@@ -117,9 +117,9 @@ public class Director extends Thread {
 			String scriptPathRead = scriptPath.trim();
 			LOG.info("Using Lua Script: " + scriptPathRead);
 
-			if (file != null && outName != null && !outName.isEmpty()) {
+			if (file != null && outName != null && !outName.isEmpty() && routName != null && !routName.isEmpty()) {
 				Director director = new Director(generatorIPs);
-				director.process(file, outName, randomBatchTimes,
+				director.process(file, outName, routName, randomBatchTimes,
 						threadCount, urlTimeout, scriptPathRead,
 						warmupDurationS, warmupRate, warmupPauseS, randomizeUsers,
 						powerCommunicators);
@@ -168,7 +168,7 @@ public class Director extends Thread {
 	 * 		False if they should be taken from a queue in order.
 	 * @param powerCommunicators Communicators for communicating with power daemon (optional).
 	 */
-	public void process(File file, String outName, boolean randomBatchTimes,
+	public void process(File file, String outName, String routName, boolean randomBatchTimes,
 			int threadCount, int timeout, String scriptPath,
 			int warmupDurationS, double warmupRate, int warmupPauseS,
 			boolean randomizeUsers,
@@ -196,8 +196,10 @@ public class Director extends Thread {
 				parentPath = ".";
 			}
 			PrintWriter writer = new PrintWriter(parentPath + "/" + outName);
+			PrintWriter r_writer = new PrintWriter(parentPath + "/" + routName);
 			writer.print("Target Time,Load Intensity,Successful Transactions,"
 			 + "Failed Transactions,Timed Out Transactions,Dropped Transactions,Avg Response Time,Final Batch Dispatch Time");
+			r_writer.print("Target Time, TransactionStartTime, Request Num, URI, Method, Response Time, Status");
 			powerCommunicators.stream().forEachOrdered(pc -> writer.print(",Watts(" + pc.getCommunicatorName() + ")"));
 
 			LOG.info("Starting Load Generation");
@@ -234,10 +236,11 @@ public class Director extends Thread {
 					System.out.println("Starting Measurement @" + timeZero + "(" + dateString + ")");
 					writer.println("," + dateString);
 				}
-				logState(result, powerCommunicators, writer);
+				logState(result, powerCommunicators, writer, r_writer);
 			}
 			System.out.println("Workload finished.");
 			writer.close();
+			r_writer.close();
 			System.out.println("Log finished.");
 			if (powerCommunicators != null && !powerCommunicators.isEmpty()) {
 				powerCommunicators.forEach(pc -> pc.stopCommunicator());
@@ -304,6 +307,7 @@ public class Director extends Thread {
 		int droppedTransactions = 0;
 		ArrayList<Double> responseTimes = new ArrayList<Double>();
 		ArrayList<Double> finalBatchTimes = new ArrayList<Double>();
+		ArrayList<PerRequestIntervalResult> requestResults = new ArrayList<>();
 		for (LoadGeneratorCommunicator communicator : communicators) {
 			if (communicator.isFinished()) {
 				finishedCommunicators++;
@@ -334,17 +338,26 @@ public class Director extends Thread {
 					timeoutTransactions += Integer.parseInt(tokens[5].trim());
 					droppedTransactions += Integer.parseInt(tokens[6].trim());
 					finalBatchTimes.add(Double.parseDouble(tokens[7].trim()));
+					String[] elements = tokens[8].trim().split("$");
+					for (String element: elements) {
+						String[] props = element.trim().split(";");
+						int requestNum = Integer.parseInt(props[0].trim());
+						double responseTime = Double.parseDouble(props[3].trim());
+						double transactionStartTime = Double.parseDouble(props[5].trim());
+						requestResults.add(new PerRequestIntervalResult(targetTime, requestNum, props[1], props[2], responseTime, props[4], transactionStartTime));
+					}
+
 				}
 			}
 		}
 		double avgResponseTime = responseTimes.stream().mapToDouble(d -> d.doubleValue()).average().getAsDouble();
 		double finalBatchTime = finalBatchTimes.stream().mapToDouble(d -> d.doubleValue()).max().getAsDouble();
 		return new IntervalResult(targetTime, loadIntensity, successfulTransactions, failedTransactions,
-				timeoutTransactions, droppedTransactions, avgResponseTime, finalBatchTime);
+				timeoutTransactions, droppedTransactions, avgResponseTime, finalBatchTime, requestResults);
 	}
 
 	private void logState(IntervalResult result, List<IPowerCommunicator> powerCommunicators,
-			PrintWriter writer) {
+			PrintWriter writer, PrintWriter r_writer) {
 		//get Power
 		List<Double> powers = null;
 		if (powerCommunicators != null && !powerCommunicators.isEmpty()) {
@@ -369,6 +382,13 @@ public class Director extends Thread {
 				powers.stream().forEachOrdered(p -> writer.print("," + p));
 			}
 			writer.println("");
+
+			for (PerRequestIntervalResult perRequestResult: result.getRequestIntervalResults()) {
+				r_writer.print(perRequestResult.getTargetTime() + "," + perRequestResult.getTransactionStartTime() + "," +
+				perRequestResult.getRequestNum() + "," + perRequestResult.getRequestURI() + "," + perRequestResult.getMethod()
+				+ "," + perRequestResult.getResponseTime() + "," + perRequestResult.getTransactionState());
+				r_writer.println("");
+			}
 		}
 	}
 

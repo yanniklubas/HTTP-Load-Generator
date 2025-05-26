@@ -286,17 +286,17 @@ public class ArrivalRateTupleLoadGenerator extends AbstractLoadGenerator {
 	 * @param actualtime The actual time of execution.
 	 */
 	private void sendBatchDataToDirector(double targettime, int loadintensity, double actualtime) {
-		ResultTracker.IntervalResult result = ResultTracker.TRACKER.retreiveIntervalResultAndReset();
+		ResultTracker.IntervalResult result = ResultTracker.TRACKER.retrieveIntervalResultAndReset();
 		sendToDirector(targettime, loadintensity, result.getSuccessfulTransactions(),
 				result.getAverageResponseTimeInS(), result.getFailedTransactions(),
-				result.getTimeoutTransactions(), result.getDroppedTransactions(), actualtime);
+				result.getTimeoutTransactions(), result.getDroppedTransactions(), actualtime, result.getRequestResults());
 	}
 
 	/**
 	 * Clear the result tracker. Use at beginning of the measurement phase.
 	 */
 	private void clearResultTracker() {
-		ResultTracker.TRACKER.retreiveIntervalResultAndReset();
+		ResultTracker.TRACKER.retrieveIntervalResultAndReset();
 	}
 
 	@Override

@@ -15,8 +15,14 @@
  */
 package tools.descartes.dlim.httploadgenerator.generator;
 
+import java.util.ArrayList;
+import java.util.concurrent.ConcurrentLinkedQueue;
 import java.util.concurrent.atomic.AtomicLong;
 import java.util.concurrent.locks.ReentrantLock;
+
+import tools.descartes.dlim.httploadgenerator.http.HTTPTransaction;
+import tools.descartes.dlim.httploadgenerator.http.HTTPTransaction.HTTPTransactionResult;
+import tools.descartes.dlim.httploadgenerator.runner.PerRequestIntervalResult;
 
 /**
  * Offers tracking of results, such as response times and
@@ -45,6 +51,8 @@ public final class ResultTracker {
 	private AtomicLong responseTimeSum = new AtomicLong(0);
 	private AtomicLong responseTimeLogCount = new AtomicLong(0);
 
+	private final ConcurrentLinkedQueue<HTTPTransactionResult> perRequestIntervalResults = new ConcurrentLinkedQueue<>();
+
 	private ResultTracker() {
 
 	}
@@ -54,10 +62,12 @@ public final class ResultTracker {
 	 * @param responseTimeMs The response time, ignored in non-successful transactions.
 	 * @param finishingState The finishing state.
 	 */
-	public void logTransaction(long responseTimeMs, TransactionState finishingState) {
+	public void logTransaction(HTTPTransactionResult result) {
 		transactionLock.lock();
+		long responseTimeMs = result.getResponseTime();
+		this.perRequestIntervalResults.add(result);
 		try {
-			switch (finishingState) {
+			switch (result.getTransactionState()) {
 				case FAILED:
 					responseTimeSum.addAndGet(responseTimeMs);
 					responseTimeLogCount.incrementAndGet();
@@ -180,7 +190,7 @@ public final class ResultTracker {
 		return ((double) avgResponseTimeMs) / 1000.0;
 	}
 
-	public IntervalResult retreiveIntervalResultAndReset() {
+	public IntervalResult retrieveIntervalResultAndReset() {
 		IntervalResult result = new IntervalResult();
 		transactionLock.lock();
 		try {
@@ -189,6 +199,12 @@ public final class ResultTracker {
 			result.timeoutTransactions = timeoutTransactionsPerMeasurementInterval.getAndSet(0);
 			result.successfulTransactions = successfulTransactionsPerMeasurementInterval.getAndSet(0);
 			result.averageResponseTimeInS = getAverageResponseTimeInSAndReset();
+			ArrayList<HTTPTransactionResult> requestResults = new ArrayList<>(this.perRequestIntervalResults.size());
+			HTTPTransactionResult element;
+			while ((element = this.perRequestIntervalResults.poll()) != null) {
+				requestResults.add(element);
+			}
+			result.setRequestResults(requestResults);
 		} finally {
 			transactionLock.unlock();
 		}
@@ -231,7 +247,10 @@ public final class ResultTracker {
 		private long successfulTransactions = 0;
 		private double averageResponseTimeInS = 0.0;
 
-		private IntervalResult() { }
+		private ArrayList<HTTPTransactionResult> requestResults = null;
+
+		private IntervalResult() {
+		}
 
 		/**
 		 * Returns the number of dropped transactions.
@@ -272,5 +291,12 @@ public final class ResultTracker {
 			return averageResponseTimeInS;
 		}
 
+		public ArrayList<HTTPTransactionResult> getRequestResults() {
+			return requestResults;
+		}
+
+		public void setRequestResults(ArrayList<HTTPTransactionResult> requestResults) {
+			this.requestResults = requestResults;
+		}
 	}
 }
