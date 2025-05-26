@@ -28,7 +28,7 @@ public abstract class Transaction implements Runnable {
 	private long startTimeMs = 0;
 
 	// the target time at which this transaction was sent
-	private long targetTime = 0;
+	private double targetTime = 0;
 
 	@Override
 	public abstract void run();
@@ -71,7 +71,7 @@ public abstract class Transaction implements Runnable {
 	 * Set the target time of the transaction at which it was queued into the threadpool.
 	 * @param targetTime The target time.
 	 */
-	public void setTargetTime(long targetTime) {
+	public void setTargetTime(double targetTime) {
 		this.targetTime = targetTime;
 	}
 
@@ -80,7 +80,7 @@ public abstract class Transaction implements Runnable {
 	 * into the threadpool.
 	 * @return The start time in system milliseconds.
 	 */
-	public long getTargetTime() {
+	public double getTargetTime() {
 		return targetTime;
 	}
 }

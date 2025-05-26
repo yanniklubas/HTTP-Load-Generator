@@ -28,7 +28,7 @@ import tools.descartes.dlim.httploadgenerator.http.HTTPTransaction;
 public class TransactionBatch {
 
 	private int size;
-	private long targetTime;
+	private double targetTime;
 
 	/**
 	 * Create a new transaction batch.
@@ -49,6 +49,7 @@ public class TransactionBatch {
 		} else {
 			size = targetArrivalRate / (int) ((targetTime - currentTime) / meanWaitInterval);
 		}
+		this.targetTime = ((double) targetTime / 1000.0);
 	}
 
 	/**
