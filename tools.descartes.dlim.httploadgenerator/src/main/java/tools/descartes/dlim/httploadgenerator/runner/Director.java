@@ -199,7 +199,7 @@ public class Director extends Thread {
 			PrintWriter r_writer = new PrintWriter(parentPath + "/" + routName);
 			writer.print("Target Time,Load Intensity,Successful Transactions,"
 			 + "Failed Transactions,Timed Out Transactions,Dropped Transactions,Avg Response Time,Final Batch Dispatch Time");
-			r_writer.println("Request Target Time, Response Target Time, Request Num, URI, Method, Response Time, Status");
+			r_writer.println("Request Target Time,Response Target Time,Request Num,URI,Method,Response Time,Status");
 			powerCommunicators.stream().forEachOrdered(pc -> writer.print(",Watts(" + pc.getCommunicatorName() + ")"));
 
 			LOG.info("Starting Load Generation");
