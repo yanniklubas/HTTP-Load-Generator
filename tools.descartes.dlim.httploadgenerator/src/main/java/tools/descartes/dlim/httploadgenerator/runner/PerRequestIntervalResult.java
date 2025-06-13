@@ -29,14 +29,11 @@ public class PerRequestIntervalResult {
 	private double responseTime;
 	private String transactionState;
 	private double transactionStartTime;
-	private double targetTime;
+	private double responseTargetTime;
 
 
-	public double getTargetTime() {
-		return targetTime;
-	}
-	public PerRequestIntervalResult(double targetTime, int requestNum, String requestURI, String method, double responseTime, String transactionState, double transactionStartTime) {
-		this.targetTime = targetTime;
+	public PerRequestIntervalResult(double responseTargetTime, int requestNum, String requestURI, String method, double responseTime, String transactionState, double transactionStartTime) {
+		this.responseTargetTime = responseTargetTime;
 		this.requestNum = requestNum;
 		this.requestURI = requestURI;
 		this.method = method;
@@ -68,6 +65,9 @@ public class PerRequestIntervalResult {
 
 	public double getTransactionStartTime() {
 		return transactionStartTime;
+	}
+	public double getResponseTargetTime() {
+		return responseTargetTime;
 	}
 
 }
