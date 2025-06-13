@@ -385,12 +385,10 @@ public class Director extends Thread {
 			writer.println("");
 
 			for (PerRequestIntervalResult perRequestResult: result.getRequestIntervalResults()) {
-				if (perRequestResult.getTransactionStartTime() > 0) {
 					r_writer.print(perRequestResult.getTransactionStartTime() + "," + perRequestResult.getResponseTargetTime() + "," +
 						perRequestResult.getRequestNum() + "," + perRequestResult.getRequestURI() + "," + perRequestResult.getMethod()
 						+ "," + perRequestResult.getResponseTime() + "," + perRequestResult.getTransactionState());
 					r_writer.println("");
-				}
 			}
 		}
 	}
