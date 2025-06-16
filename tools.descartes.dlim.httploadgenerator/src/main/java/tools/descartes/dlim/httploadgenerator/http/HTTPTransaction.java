@@ -61,6 +61,7 @@ public class HTTPTransaction extends Transaction {
 		}
 
 		String url = generator.getNextInput().trim();
+		requestNum = generator.getCurrentCallNum();
 		String method = "GET";
 		if (url.startsWith("[")) {
 			if (url.startsWith(POST_SIGNAL)) {
