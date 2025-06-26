@@ -52,6 +52,7 @@ public class HTTPTransaction extends Transaction {
 	 */
 	public HTTPTransactionResult process(HTTPInputGenerator generator) {
 		long processStartTime = System.currentTimeMillis();
+		long performanceStartTime = System.nanoTime();
 		int requestNum = generator.getCurrentCallNum();
 		if (generator.getTimeout() > 0 && processStartTime - getStartTime() > generator.getTimeout()) {
 			LOG.warning("Wait time in queue too long. "
@@ -81,7 +82,7 @@ public class HTTPTransaction extends Transaction {
 		try {
 			ContentResponse response = request.send();
 			if (response.getStatus() >= 400) {
-				long responseTime = System.currentTimeMillis() - processStartTime;
+				long responseTime = System.nanoTime() - performanceStartTime;
 				generator.revertLastCall();
 				LOG.log(Level.FINEST, "Received error response code: " + response.getStatus());
 				result.setTransactionState(TransactionState.FAILED);
@@ -89,7 +90,7 @@ public class HTTPTransaction extends Transaction {
 				return result;
 			} else {
 				String responseBody = response.getContentAsString();
-				long responseTime = System.currentTimeMillis() - processStartTime;
+				long responseTime = System.nanoTime() - performanceStartTime;
 
 				// store result
 				generator.resetHTMLFunctions(responseBody);
@@ -103,7 +104,7 @@ public class HTTPTransaction extends Transaction {
 			LOG.warning("TimeoutException: " + e.getMessage());
 			return result;
 		} catch (ExecutionException e) {
-			long responseTime = System.currentTimeMillis() - processStartTime;
+			long responseTime = System.nanoTime() - performanceStartTime;
 			if (e.getCause() == null || !(e.getCause() instanceof TimeoutException)) {
 				LOG.log(Level.SEVERE,
 						"ExecutionException in call for URL: " + url + "; Cause: " + e.getCause().toString());
@@ -113,14 +114,14 @@ public class HTTPTransaction extends Transaction {
 			result.setResponseTime(responseTime);
 			return result;
 		} catch (CancellationException e) {
-			long responseTime = System.currentTimeMillis() - processStartTime;
+			long responseTime = System.nanoTime() - performanceStartTime;
 			LOG.log(Level.SEVERE, "CancellationException: " + url + "; " + e.getMessage());
 			generator.revertLastCall();
 			result.setTransactionState(TransactionState.FAILED);
 			result.setResponseTime(responseTime);
 			return result;
 		} catch (InterruptedException e) {
-			long responseTime = System.currentTimeMillis() - processStartTime;
+			long responseTime = System.nanoTime() - performanceStartTime;
 			LOG.log(Level.SEVERE, "InterruptedException: " + e.getMessage());
 			generator.revertLastCall();
 			result.setTransactionState(TransactionState.FAILED);
