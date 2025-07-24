@@ -20,6 +20,7 @@ import java.util.concurrent.TimeUnit;
 import java.util.logging.Logger;
 import java.util.regex.Pattern;
 
+import org.eclipse.jetty.client.Destination;
 import org.eclipse.jetty.client.HttpClient;
 import org.eclipse.jetty.client.Request;
 import org.eclipse.jetty.client.StringRequestContent;
@@ -178,6 +179,18 @@ public class HTTPInputGenerator {
 	 */
 	public void resetHTMLFunctions(String html) {
 		htmlFunctions.resetHTMLFunctions(html);
+	}
+
+	/**
+	 * Reset the Connection for the given request.
+	 *
+	 * @param request The request to remove the connection for.
+	 */
+	public void resetConnection(Request request) {
+		if (this.httpClient != null) {
+			Destination dest = httpClient.resolveDestination(request);
+			httpClient.removeDestination(dest);
+		}
 	}
 
 	/**

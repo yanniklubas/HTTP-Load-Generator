@@ -87,7 +87,6 @@ public class HTTPTransaction extends Transaction {
 				LOG.log(Level.FINEST, "Received error response code: " + response.getStatus());
 				result.setTransactionState(TransactionState.FAILED);
 				result.setResponseTime(responseTime);
-				return result;
 			} else {
 				String responseBody = response.getContentAsString();
 				long responseTime = System.nanoTime() - performanceStartTime;
@@ -95,14 +94,12 @@ public class HTTPTransaction extends Transaction {
 				// store result
 				generator.resetHTMLFunctions(responseBody);
 				result.setResponseTime(responseTime);
-				return result;
 			}
 		} catch (TimeoutException e) {
 			generator.revertLastCall();
 			result.setResponseTime(generator.getTimeout());
 			result.setTransactionState(TransactionState.TIMEOUT);
 			LOG.warning("TimeoutException: " + e.getMessage());
-			return result;
 		} catch (ExecutionException e) {
 			long responseTime = System.nanoTime() - performanceStartTime;
 			if (e.getCause() == null || !(e.getCause() instanceof TimeoutException)) {
@@ -112,22 +109,23 @@ public class HTTPTransaction extends Transaction {
 			generator.revertLastCall();
 			result.setTransactionState(TransactionState.FAILED);
 			result.setResponseTime(responseTime);
-			return result;
 		} catch (CancellationException e) {
 			long responseTime = System.nanoTime() - performanceStartTime;
 			LOG.log(Level.SEVERE, "CancellationException: " + url + "; " + e.getMessage());
 			generator.revertLastCall();
 			result.setTransactionState(TransactionState.FAILED);
 			result.setResponseTime(responseTime);
-			return result;
 		} catch (InterruptedException e) {
 			long responseTime = System.nanoTime() - performanceStartTime;
 			LOG.log(Level.SEVERE, "InterruptedException: " + e.getMessage());
 			generator.revertLastCall();
 			result.setTransactionState(TransactionState.FAILED);
 			result.setResponseTime(responseTime);
-			return result;
 		}
+
+		generator.resetConnection(request);
+
+		return result;
 	}
 
 	@Override
