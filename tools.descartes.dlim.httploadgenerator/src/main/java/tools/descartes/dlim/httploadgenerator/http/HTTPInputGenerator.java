@@ -20,7 +20,8 @@ import java.util.concurrent.TimeUnit;
 import java.util.logging.Logger;
 import java.util.regex.Pattern;
 
-import org.eclipse.jetty.client.Destination;
+import org.eclipse.jetty.client.Connection;
+import org.eclipse.jetty.client.DuplexConnectionPool;
 import org.eclipse.jetty.client.HttpClient;
 import org.eclipse.jetty.client.Request;
 import org.eclipse.jetty.client.StringRequestContent;
@@ -79,6 +80,21 @@ public class HTTPInputGenerator {
 	public HTTPInputGenerator(int id, File scriptFile, int randomSeed, int timeout) {
 		this.id = id;
 		httpClient = new HttpClient();
+		httpClient.setMaxConnectionsPerDestination(1);
+		httpClient.getTransport().setConnectionPoolFactory(dest -> new DuplexConnectionPool(dest, 1) {
+			@Override
+			public Connection acquire(boolean create) {
+				// Always return null to force new connection creation
+				return null;
+			}
+
+			@Override
+			public boolean release(Connection connection) {
+				// Immediately close the connection instead of pooling it
+				connection.close();
+				return false;
+			}
+		});
 
 		if (timeout > 0) {
 			httpClient.setConnectTimeout(timeout);
@@ -120,7 +136,9 @@ public class HTTPInputGenerator {
 		} else {
 			request = httpClient.newRequest(url);
 		}
-		request = request.agent(USER_AGENT);
+		request = request.agent(USER_AGENT).headers(headers -> {
+			headers.put("Connection", "close");
+		});
 		if (timeout > 0) {
 			request = request.timeout(timeout, TimeUnit.MILLISECONDS)
 					.idleTimeout(timeout, TimeUnit.MILLISECONDS);
@@ -181,17 +199,6 @@ public class HTTPInputGenerator {
 		htmlFunctions.resetHTMLFunctions(html);
 	}
 
-	/**
-	 * Reset the Connection for the given request.
-	 *
-	 * @param request The request to remove the connection for.
-	 */
-	public void resetConnection(Request request) {
-		if (this.httpClient != null) {
-			Destination dest = httpClient.resolveDestination(request);
-			httpClient.removeDestination(dest);
-		}
-	}
 
 	/**
 	 * Get the last call that was generated on calling {@link #getNextInput()}.

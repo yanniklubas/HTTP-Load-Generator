@@ -123,8 +123,6 @@ public class HTTPTransaction extends Transaction {
 			result.setResponseTime(responseTime);
 		}
 
-		generator.resetConnection(request);
-
 		return result;
 	}
 
