@@ -21,8 +21,8 @@ import java.util.logging.Logger;
 import java.util.regex.Pattern;
 
 import org.eclipse.jetty.client.HttpClient;
-import org.eclipse.jetty.client.api.Request;
-import org.eclipse.jetty.client.util.StringContentProvider;
+import org.eclipse.jetty.client.Request;
+import org.eclipse.jetty.client.StringRequestContent;
 import org.eclipse.jetty.http.HttpMethod;
 import org.luaj.vm2.Globals;
 import org.luaj.vm2.LuaTable;
@@ -112,14 +112,14 @@ public class HTTPInputGenerator {
 			url = split[0].trim();
 			request = httpClient.POST(url);
 			if (split.length == 2) {
-				request.content(new StringContentProvider(split[1]), "application/json");
+				request.body(new StringRequestContent("application/json", split[1]));
 			}
 		} else if (method.equalsIgnoreCase("PUT")) {
 			request = httpClient.newRequest(url).method(HttpMethod.PUT);
 		} else {
 			request = httpClient.newRequest(url);
 		}
-		request = request.header("User-Agent", USER_AGENT);
+		request = request.agent(USER_AGENT);
 		if (timeout > 0) {
 			request = request.timeout(timeout, TimeUnit.MILLISECONDS)
 					.idleTimeout(timeout, TimeUnit.MILLISECONDS);
@@ -153,8 +153,8 @@ public class HTTPInputGenerator {
 	 */
 	private void restartCycle() {
 		currentCallNum = 1;
-		if (httpClient != null && httpClient.getCookieStore() != null) {
-			httpClient.getCookieStore().removeAll();
+		if (httpClient != null && httpClient.getHttpCookieStore() != null) {
+			httpClient.getHttpCookieStore().clear();
 		}
 		LuaValue cycleInit = luaGlobals.get(LUA_CYCLE_INIT);
 		if (!cycleInit.isnil()) {
