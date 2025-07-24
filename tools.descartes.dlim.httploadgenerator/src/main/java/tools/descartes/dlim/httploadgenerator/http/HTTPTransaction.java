@@ -135,13 +135,6 @@ public class HTTPTransaction extends Transaction {
 		HTTPInputGenerator generator = HTTPInputGeneratorPool.getPool().takeFromPool();
 		HTTPTransactionResult result = this.process(generator);
 		ResultTracker.TRACKER.logTransaction(result);
-		// } catch (TransactionDroppedException e) {
-		// 	ResultTracker.TRACKER.logTransaction(0, ResultTracker.TransactionState.DROPPED);
-		// } catch (TransactionInvalidException e) {
-		// 	ResultTracker.TRACKER.logTransaction(e.responseTime, ResultTracker.TransactionState.FAILED);
-		// } catch (TransactionTimeoutException e) {
-		// 	ResultTracker.TRACKER.logTransaction(generator.getTimeout(), ResultTracker.TransactionState.TIMEOUT);
-		// }
 		HTTPInputGeneratorPool.getPool().releaseBackToPool(generator);
 		TransactionQueueSingleton transactionQueue = TransactionQueueSingleton.getInstance();
 		transactionQueue.addQueueElement(this);
