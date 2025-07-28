@@ -20,8 +20,6 @@ import java.util.concurrent.TimeUnit;
 import java.util.logging.Logger;
 import java.util.regex.Pattern;
 
-import org.eclipse.jetty.client.Connection;
-import org.eclipse.jetty.client.DuplexConnectionPool;
 import org.eclipse.jetty.client.HttpClient;
 import org.eclipse.jetty.client.Request;
 import org.eclipse.jetty.client.StringRequestContent;
@@ -81,20 +79,6 @@ public class HTTPInputGenerator {
 		this.id = id;
 		httpClient = new HttpClient();
 		httpClient.setMaxConnectionsPerDestination(1);
-		httpClient.getTransport().setConnectionPoolFactory(dest -> new DuplexConnectionPool(dest, 1) {
-			@Override
-			public Connection acquire(boolean create) {
-				// Always return null to force new connection creation
-				return null;
-			}
-
-			@Override
-			public boolean release(Connection connection) {
-				// Immediately close the connection instead of pooling it
-				connection.close();
-				return false;
-			}
-		});
 
 		if (timeout > 0) {
 			httpClient.setConnectTimeout(timeout);
