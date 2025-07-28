@@ -104,13 +104,13 @@ public class Director extends Thread {
 			boolean randomBatchTimes = true;
 			if (randomSeed <= 0) {
 				LOG.info("No Random Seed for Batch Generation specified. "
-						+ "This parameter is unneeded for request time stamp generation.");
+						+ "This parameter is needed for request time stamp generation.");
 				randomBatchTimes = false;
 				LOG.info("Using equi-distant non-random inter batch times.");
 			}
 
 			LOG.info("Load Generator Thread Count set to " + threadCount);
-			LOG.info("URL connection timout set to " + urlTimeout + " ms");
+			LOG.info("URL connection timeout set to " + urlTimeout + " ms");
 
 
 			//Script Path
@@ -129,7 +129,7 @@ public class Director extends Thread {
 
 	/**
 	 * Inititializes a director with a load generator address.
-	 * @param loadGenerators Addresses of the load generator. Seperated by ",".
+	 * @param loadGenerators Addresses of the load generator. Separated by ",".
 	 */
 	public Director(String[] loadGenerators) {
 		communicators = new ArrayList<>(loadGenerators.length);
@@ -228,7 +228,7 @@ public class Director extends Thread {
 			//get Data from LoadGenerator
 			IntervalResult result;
 			while (!(result = collectResultRound()).isMeasurementConcluded()) {
-				//Check if a result for time 0 is sent. This result is only sent if warmup occured.
+				//Check if a result for time 0 is sent. This result is only sent if warmup occurred.
 				if (result.getTargetTime() == 0.0) {
 					timeZero = System.currentTimeMillis();
 					String dateString = sdf.format(new Date(timeZero));
