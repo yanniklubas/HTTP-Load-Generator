@@ -78,7 +78,12 @@ public class HTTPTransaction extends Transaction {
 
 		HTTPTransactionResult result = new HTTPTransactionResult(this.getTargetTime(), ResultTracker.TransactionState.SUCCESS, requestNum);
 		result.setMethod(method);
-		result.setRequestURI(url);
+		int index = url.indexOf("[");
+		if (index != -1) {
+			result.setRequestURI(url.substring(0, index));
+		} else {
+			result.setRequestURI(url);
+		}
 
 		try {
 			ContentResponse response = request.send();
