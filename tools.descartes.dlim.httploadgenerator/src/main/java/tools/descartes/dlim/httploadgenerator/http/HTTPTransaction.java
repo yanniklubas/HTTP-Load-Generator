@@ -89,7 +89,7 @@ public class HTTPTransaction extends Transaction {
 			ContentResponse response = request.send();
 			if (response.getStatus() >= 400) {
 				long responseTime = System.nanoTime() - performanceStartTime;
-			responseTime = TimeUnit.NANOSECONDS.toMillis(responseTime);
+				responseTime = TimeUnit.NANOSECONDS.toMillis(responseTime);
 				generator.revertLastCall();
 				LOG.log(Level.FINEST, "Received error response code: " + response.getStatus());
 				result.setTransactionState(TransactionState.FAILED);
@@ -97,7 +97,7 @@ public class HTTPTransaction extends Transaction {
 			} else {
 				String responseBody = response.getContentAsString();
 				long responseTime = System.nanoTime() - performanceStartTime;
-			responseTime = TimeUnit.NANOSECONDS.toMillis(responseTime);
+				responseTime = TimeUnit.NANOSECONDS.toMillis(responseTime);
 
 				// store result
 				generator.resetHTMLFunctions(responseBody);
