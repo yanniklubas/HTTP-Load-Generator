@@ -76,7 +76,7 @@ public abstract class Transaction implements Runnable {
 	}
 
 	/**
-	 * Gets the Transaction's start time. The start time is the time at which it was queued
+	 * Gets the Transaction's start target time. The start target time is the time at which it was queued
 	 * into the threadpool.
 	 * @return The start time in system milliseconds.
 	 */
