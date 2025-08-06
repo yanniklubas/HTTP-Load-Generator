@@ -36,20 +36,20 @@ import tools.descartes.dlim.httploadgenerator.generator.ArrivalRateTuple;
  *
  */
 public class LoadGeneratorCommunicator {
-	
+
 	private static final Logger LOG = Logger.getLogger(LoadGeneratorCommunicator.class.getName());
-	
+
 	private Socket socket = null;
 	private BufferedReader in = null;
 	private PrintWriter out = null;
 
 	private String ip;
 	private int port;
-	
+
 	private boolean finished = false;
-	
+
 	private BlockingQueue<String> resultMessageQueue = new LinkedBlockingQueue<>();
-	
+
 	/**
 	 * Create a new communicator.
 	 * @param ip IP or host name of the load generator.
@@ -67,7 +67,7 @@ public class LoadGeneratorCommunicator {
 			LOG.severe("Could not connect to LoadGenerator.");
 		}
 	}
-	
+
 	/**
 	 * Sends a lua script to the load generator.
 	 * @param scriptPath The path of the script file on the director's file system.
@@ -89,7 +89,7 @@ public class LoadGeneratorCommunicator {
 		}
 		waitForOK();
 	}
-	
+
 	/**
 	 * Sends a list of arrival rates to the load generator.
 	 * @param rates List of arrival rate tuples.
@@ -107,16 +107,16 @@ public class LoadGeneratorCommunicator {
 		out.flush();
 		waitForOK();
 	}
-	
+
 	/**
-	 * Send the thread count to the load generator.
-	 * @param threadCount The number of thread the load generator is to use for generating.
+	 * Send the virtual user count to the load generator.
+	 * @param userCount The number of virtual users the load generator is to use for generating.
 	 */
-	public void sendThreadCount(int threadCount) {
-		out.println(IRunnerConstants.THREAD_NUM_KEY + threadCount);
+	public void sendVirtualUserCount(int userCount) {
+		out.println(IRunnerConstants.USER_NUM_KEY + userCount);
 		waitForOK();
 	}
-	
+
 	/**
 	 * Send the url connection timeout to the load generator.
 	 * @param timeout The url connection timout.
@@ -158,7 +158,7 @@ public class LoadGeneratorCommunicator {
 		new LoadGeneratorCommunicatorThread().start();
 		return time;
 	}
-	
+
 	/**
 	 * Gets the latest result message received by the communicator.
 	 * Blocks and waits if no message was received.
@@ -174,8 +174,8 @@ public class LoadGeneratorCommunicator {
 		}
 		return null;
 	}
-	
-	
+
+
 	private void waitForOK() {
 		waitForMessage("ok");
 	}
@@ -194,7 +194,7 @@ public class LoadGeneratorCommunicator {
 			}
 		}
 	}
-	
+
 	/**
 	 * Returns true if this communcator has received the done signal.
 	 * @return The finshed flag.
@@ -213,7 +213,7 @@ public class LoadGeneratorCommunicator {
 	 *
 	 */
 	private class LoadGeneratorCommunicatorThread extends Thread {
-		
+
 		@Override
 		public void run() {
 			try {
@@ -225,7 +225,7 @@ public class LoadGeneratorCommunicator {
 					} else if (line != null && !line.isEmpty()) {
 						resultMessageQueue.put(line.trim());
 					}
-				} 
+				}
 			} catch (IOException | InterruptedException e) {
 				LOG.severe("Error reading result response from load generator at: " + ip + ":" + port);
 			} finally {
@@ -236,9 +236,9 @@ public class LoadGeneratorCommunicator {
 				} catch (IOException e) {
 					LOG.severe("Error closing network connection to load generator at: " + ip + ":" + port);
 				}
-				
+
 			}
-			
+
 		}
 	}
 }
