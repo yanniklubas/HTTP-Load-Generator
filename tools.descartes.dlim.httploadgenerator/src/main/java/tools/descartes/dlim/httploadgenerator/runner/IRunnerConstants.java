@@ -46,9 +46,9 @@ public interface IRunnerConstants {
 	 */
 	public static final String DEFAULT_LUA_PATH = "http_calls.lua";
 	/**
-	 * Default number of load generation threads.
+	 * Default number of load generation virtual users.
 	 */
-	public static final int DEFAULT_THREAD_NUM = 128;
+	public static final int DEFAULT_VIRTUAL_USER_NUM = 128;
 
 	/**
 	 * The default warmup duration in seconds.
@@ -89,7 +89,7 @@ public interface IRunnerConstants {
 	/**
 	 * Signal for sending number of load generation threads.
 	 */
-	public static final String THREAD_NUM_KEY = "threadnum:";
+	public static final String USER_NUM_KEY = "usernum:";
 	/**
 	 * Signal for sending the http timeout.
 	 */

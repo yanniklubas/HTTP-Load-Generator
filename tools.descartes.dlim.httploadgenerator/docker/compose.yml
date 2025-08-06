@@ -35,7 +35,7 @@ services:
       - "loadgenerator/summary_out.csv"
       - "-ro"
       - "loadgenerator/request_out.csv"
-      - "-t"
+      - "-u"
       - "${VIRTUAL_USERS}"
       - "--timeout"
       - "${TIMEOUT}"

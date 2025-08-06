@@ -24,10 +24,15 @@ import java.util.concurrent.LinkedBlockingQueue;
 import java.util.concurrent.Semaphore;
 import java.util.logging.Logger;
 
+import org.eclipse.jetty.client.HttpClient;
+import org.eclipse.jetty.http.HttpCookieStore;
+import org.eclipse.jetty.util.thread.QueuedThreadPool;
+
+
 /**
  * Pool of input stateful generators to be assigned to the load generation
  * transactions.
- * 
+ *
  * @author Joakim von Kistowski
  *
  */
@@ -37,17 +42,22 @@ public final class HTTPInputGeneratorPool {
 
 	private static HTTPInputGeneratorPool pool = null;
 
+	private static final int MIN_JETTY_THREADS = 32;
+	private static final int MAX_JETTY_THREADS = 512;
+	private static final int JETTY_THREAD_IDLE_TIMEOUT_MS = 60000;
+
 	private Random random;
 	private PoolMode mode;
 	private BlockingQueue<HTTPInputGenerator> queue;
 	private ConcurrentHashMap<Integer, HTTPInputGenerator> map;
 	private Semaphore mapAccessControlSemaphore;
+	private HttpClient httpClient;
 
-	private HTTPInputGeneratorPool(PoolMode mode, String luaScriptPath, int threadCount, int timeout, int randomSeed) {
+	private HTTPInputGeneratorPool(PoolMode mode, String luaScriptPath, int virtualUserCount, int timeout, int randomSeed) {
 		this.mode = mode;
 		queue = new LinkedBlockingQueue<>();
 		map = new ConcurrentHashMap<>();
-		mapAccessControlSemaphore = new Semaphore(threadCount, true);
+		mapAccessControlSemaphore = new Semaphore(virtualUserCount, true);
 		if (randomSeed > 0) {
 			random = new Random(randomSeed);
 		} else {
@@ -57,9 +67,29 @@ public final class HTTPInputGeneratorPool {
 		if (!script.exists()) {
 			LOG.severe("Lua script does not exist at: " + luaScriptPath);
 		}
-		// We place as many input generators as threads in the pool.
-		for (int i = 0; i < threadCount; i++) {
-			addInputGenerator(new HTTPInputGenerator(i, script, i, timeout));
+
+
+		BlockingQueue<Runnable> executorQueue = new LinkedBlockingQueue<>();
+		QueuedThreadPool executor = new QueuedThreadPool(MAX_JETTY_THREADS, MIN_JETTY_THREADS, JETTY_THREAD_IDLE_TIMEOUT_MS, executorQueue);
+
+		HttpClient httpClient = new HttpClient();
+		httpClient.setExecutor(executor);
+		httpClient.setMaxConnectionsPerDestination(virtualUserCount + (virtualUserCount / 2));
+		httpClient.setMaxRequestsQueuedPerDestination(virtualUserCount + (virtualUserCount / 2));
+		httpClient.setHttpCookieStore(new HttpCookieStore.Empty());
+
+		if (timeout > 0) {
+			httpClient.setConnectTimeout(timeout);
+		}
+		try {
+			httpClient.start();
+		} catch (Exception e) {
+			LOG.severe("Could not start HTTP client; Exception: " + e.getMessage());
+		}
+		this.httpClient = httpClient;
+		// We place as many input generators as virtual users in the pool.
+		for (int i = 0; i < virtualUserCount; i++) {
+			addInputGenerator(new HTTPInputGenerator(i, script, i, timeout, this.httpClient));
 		}
 		if (mode.equals(PoolMode.QUEUE)) {
 			LOG.info("Created pool of " + queue.size() + " users (LUA contexts, HTTP input generators).");
@@ -82,7 +112,7 @@ public final class HTTPInputGeneratorPool {
 
 	/**
 	 * Get the pool. Must have been initialized.
-	 * 
+	 *
 	 * @return The pool singleton. Null if uninitialized.
 	 */
 	public static HTTPInputGeneratorPool getPool() {
@@ -95,20 +125,20 @@ public final class HTTPInputGeneratorPool {
 
 	/**
 	 * Initializes the pool (deleting an old one if it exists).
-	 * 
+	 *
 	 * @param luaScriptPath The path of the Lua script.
-	 * @param threadCount   The number of threads that will be used to access the
+	 * @param virtualUserCount   The number of threads that will be used to access the
 	 *                      pool.
 	 * @param timeout       The http url connection timeout.
 	 */
-	public static void initializePool(PoolMode mode, String luaScriptPath, int threadCount, int timeout,
+	public static void initializePool(PoolMode mode, String luaScriptPath, int virtualUserCount, int timeout,
 			int randomSeed) {
-		pool = new HTTPInputGeneratorPool(mode, luaScriptPath, threadCount, timeout, randomSeed);
+		pool = new HTTPInputGeneratorPool(mode, luaScriptPath, virtualUserCount, timeout, randomSeed);
 	}
 
 	/**
 	 * Places an HTTPInputGenerator back into the pool.
-	 * 
+	 *
 	 * @param generator The generator to place in the pool.
 	 */
 	public void releaseBackToPool(HTTPInputGenerator generator) {
@@ -128,7 +158,7 @@ public final class HTTPInputGeneratorPool {
 	/**
 	 * Retrieves an HTTPInputGenerator from the pool. Don't forget to but it back
 	 * after use.
-	 * 
+	 *
 	 * @return The generator to use.
 	 */
 	public HTTPInputGenerator takeFromPool() {

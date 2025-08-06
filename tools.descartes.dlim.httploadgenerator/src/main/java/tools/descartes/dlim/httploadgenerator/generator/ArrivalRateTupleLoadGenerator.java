@@ -57,8 +57,8 @@ public class ArrivalRateTupleLoadGenerator extends AbstractLoadGenerator {
 	private List<ArrivalRateTuple> arrRates;
 
 
-	/** Number of threads for generating load. */
-	private static int numberOfThreads = 128;
+	/** Number of virtual users for generating load. */
+	private static int numberOfVirtualUsers = 128;
 
 	/** Generation of random numbers. */
 	private static Random r = new Random();
@@ -106,9 +106,10 @@ public class ArrivalRateTupleLoadGenerator extends AbstractLoadGenerator {
 			if (randomizeUsers) {
 				mode = HTTPInputGeneratorPool.PoolMode.RANDOM;
 			}
-			HTTPInputGeneratorPool.initializePool(mode, getScriptPath(), numberOfThreads, getTimeout(), seed);
+			HTTPInputGeneratorPool.initializePool(mode, getScriptPath(), numberOfVirtualUsers, getTimeout(), seed);
 			LinkedBlockingQueue<Runnable> executorQueue = new LinkedBlockingQueue<Runnable>();
-			executor = new ThreadPoolExecutor(numberOfThreads, numberOfThreads, 0, TimeUnit.MILLISECONDS,
+			int numThreads = Runtime.getRuntime().availableProcessors() * 2;
+			executor = new ThreadPoolExecutor(numThreads, numThreads, 0, TimeUnit.MILLISECONDS,
 					executorQueue);
 			TransactionQueueSingleton.getInstance().resetAndpreInitializeTransactions(HTTPTransaction.class, 400);
 
@@ -170,7 +171,7 @@ public class ArrivalRateTupleLoadGenerator extends AbstractLoadGenerator {
 			//wait for remaining transactions to trickle in
 			nextTimeStamp += 1000;
 
-			while (executor.getActiveCount() > 0) {
+			while (ResultTracker.TRACKER.getActiveRequests() > 0) {
 				long currentTime = System.currentTimeMillis() - timeZero;
 
 				while (currentTime - (nextTimeStamp) < -defaultMeanWaitTime) {
@@ -305,10 +306,10 @@ public class ArrivalRateTupleLoadGenerator extends AbstractLoadGenerator {
 	}
 
 	/**
-	 * Set the number of threads for the load generator.
+	 * Set the number of virtual users for the load generator.
 	 * @param threads Number of threads.
 	 */
-	public void setNumberOfThreads(int threads) {
-		numberOfThreads = threads;
+	public void setNumberOfVirtualUsers(int users) {
+		numberOfVirtualUsers = users;
 	}
 }

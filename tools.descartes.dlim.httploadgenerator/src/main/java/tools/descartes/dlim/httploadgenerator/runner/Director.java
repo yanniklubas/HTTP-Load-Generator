@@ -156,7 +156,7 @@ public class Director extends Thread {
 	 * @param outName The name of the output log.
 	 * @param scanner The scanner for reading user start signal from console.
 	 * @param randomBatchTimes True if batches are scheduled using a randomized distribution.
-	 * @param threadCount The number of threads that generate load.
+	 * @param userCount The number of virtual users that generate load.
 	 * @param timeout The connection timeout for the HTTP url connections.
 	 * @param scriptPath The path of the script file that generates the specific requests.
 	 * @param warmupDurationS The duration of a potential warmup period in seconds.
@@ -169,7 +169,7 @@ public class Director extends Thread {
 	 * @param powerCommunicators Communicators for communicating with power daemon (optional).
 	 */
 	public void process(File file, String outName, String routName, boolean randomBatchTimes,
-			int threadCount, int timeout, String scriptPath,
+			int userCount, int timeout, String scriptPath,
 			int warmupDurationS, double warmupRate, int warmupPauseS,
 			boolean randomizeUsers,
 			List<IPowerCommunicator> powerCommunicators) {
@@ -180,8 +180,8 @@ public class Director extends Thread {
 			communicators.parallelStream().forEach(c-> c.sendArrivalRates(arrRates, communicators.size()));
 			LOG.info("Arrival Rates sent to Load Generator(s).");
 
-			communicators.parallelStream().forEach(c-> c.sendThreadCount(threadCount));
-			LOG.info("Thread Count sent to Load Generator(s): " + threadCount);
+			communicators.parallelStream().forEach(c-> c.sendVirtualUserCount(userCount));
+			LOG.info("Virtual User Count sent to Load Generator(s): " + userCount);
 
 			communicators.parallelStream().forEach(c-> c.sendTimeout(timeout));
 			if (timeout > 0) {

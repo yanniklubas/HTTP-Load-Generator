@@ -65,11 +65,11 @@ public class DirectorCommand implements Runnable {
 			description="Integer seed for the @|yellow r|@andom generator. Seed of 0 => Equi-distant dispatch times.")
 	private int randomSeed = 5;
 
-	@Option(names = {"--threads", "--threadcount", "-t"},
-			paramLabel = "NUM_THREADS",
-			description="Number of @|yellow t|@hreads used by the load generator. "
+	@Option(names = {"--virtualusers", "--virtualusercount", "-v"},
+			paramLabel = "NUM_VIRTUAL_USERS",
+			description="Number of @|yellow v|@irtual users used by the load generator. "
 					+ "Increase this number in case of dropped transactions.")
-	private int threadCount = IRunnerConstants.DEFAULT_THREAD_NUM;;
+	private int virtualUserCount = IRunnerConstants.DEFAULT_VIRTUAL_USER_NUM;
 
 	@Option(names = {"--timeout", "-u"},
 			paramLabel = "TIMEOUT",
@@ -116,7 +116,7 @@ public class DirectorCommand implements Runnable {
 	@Override
 	public void run() {
 		Director.executeDirector(profilePath, outName, routName, powerAddresses, generators,
-				randomSeed, threadCount, urlTimeout, scriptPath, randomizeUsers, warmupRate, warmupDuration,
+				randomSeed, virtualUserCount, urlTimeout, scriptPath, randomizeUsers, warmupRate, warmupDuration,
 				warmupPause, powerCommunicatorClassName);
 	}
 }

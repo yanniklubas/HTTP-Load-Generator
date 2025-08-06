@@ -20,9 +20,7 @@ import java.util.concurrent.ConcurrentLinkedQueue;
 import java.util.concurrent.atomic.AtomicLong;
 import java.util.concurrent.locks.ReentrantLock;
 
-import tools.descartes.dlim.httploadgenerator.http.HTTPTransaction;
 import tools.descartes.dlim.httploadgenerator.http.HTTPTransaction.HTTPTransactionResult;
-import tools.descartes.dlim.httploadgenerator.runner.PerRequestIntervalResult;
 
 /**
  * Offers tracking of results, such as response times and
@@ -53,8 +51,19 @@ public final class ResultTracker {
 
 	private final ConcurrentLinkedQueue<HTTPTransactionResult> perRequestIntervalResults = new ConcurrentLinkedQueue<>();
 
+	private AtomicLong totalReceivedRequests = new AtomicLong(0);
+	private AtomicLong totalSentRequests = new AtomicLong(0);
+
 	private ResultTracker() {
 
+	}
+
+	public void addSentRequest() {
+		totalSentRequests.incrementAndGet();
+	}
+
+	public long getActiveRequests() {
+		return totalSentRequests.get() - totalReceivedRequests.get();
 	}
 
 	/**
@@ -66,6 +75,7 @@ public final class ResultTracker {
 		transactionLock.lock();
 		long responseTimeMs = result.getResponseTime();
 		this.perRequestIntervalResults.add(result);
+		this.totalReceivedRequests.incrementAndGet();
 		try {
 			switch (result.getTransactionState()) {
 				case FAILED:
@@ -83,6 +93,7 @@ public final class ResultTracker {
 					responseTimeLogCount.incrementAndGet();
 					timeoutTransactionsPerMeasurementInterval.incrementAndGet();
 					timeoutTransactionsTotal.incrementAndGet();
+					break;
 				default:
 					responseTimeSum.addAndGet(responseTimeMs);
 					responseTimeLogCount.incrementAndGet();

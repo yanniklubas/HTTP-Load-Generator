@@ -15,23 +15,33 @@
  */
 package tools.descartes.dlim.httploadgenerator.http;
 
-import java.util.concurrent.CancellationException;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
-import java.util.logging.Level;
 import java.util.logging.Logger;
 
-import org.eclipse.jetty.client.ContentResponse;
+import java.net.UnknownHostException;
+import java.net.NoRouteToHostException;
+import java.net.ConnectException;
+import java.net.SocketTimeoutException;
+import java.nio.channels.UnresolvedAddressException;
+import java.util.concurrent.RejectedExecutionException;
+
+import org.eclipse.jetty.client.BufferingResponseListener;
 import org.eclipse.jetty.client.Request;
+import org.eclipse.jetty.client.Response;
+import org.eclipse.jetty.client.Result;
+import org.eclipse.jetty.http.HttpField;
+import org.eclipse.jetty.http.HttpHeader;
 
 import tools.descartes.dlim.httploadgenerator.generator.ResultTracker;
 import tools.descartes.dlim.httploadgenerator.generator.ResultTracker.TransactionState;
 import tools.descartes.dlim.httploadgenerator.transaction.Transaction;
 import tools.descartes.dlim.httploadgenerator.transaction.TransactionQueueSingleton;
 
+
 /**
- * HTTP transaction sends HTML requests to a HTTP web server based on a LUA
+ * {@link HTTPTransaction} sends HTML requests to a HTTP web server based on a LUA
  * script.
  *
  * @author Joakim von Kistowski, Maximilian Deffner
@@ -46,24 +56,33 @@ public class HTTPTransaction extends Transaction {
 	private static final Logger LOG = Logger.getLogger(HTTPTransaction.class.getName());
 
 	/**
-	 * Processes the transaction of sending a GET request to a web server.
-	 *
-	 * @param generator The input generator to use.
-	 * @return Response time in milliseconds.
-	 */
-	public HTTPTransactionResult process(HTTPInputGenerator generator) {
+     * Asynchronously processes an HTTP transaction using Jetty's non-blocking client.
+     * This method is more scalable and recommended for high-throughput load generation.
+     *
+     * @param generator The {@link HTTPInputGenerator} that provides the next target URL and request method.
+     */
+	private void processAsync(HTTPInputGenerator generator) {
 		long processStartTime = System.currentTimeMillis();
-		long performanceStartTime = System.nanoTime();
+		long requestStartTime = System.nanoTime();
 		int requestNum = generator.getCurrentCallNum();
+
+		// Check if request is dropped. This indicates a bottleneck in the loadgenerator not in the application.
 		if (generator.getTimeout() > 0 && processStartTime - getStartTime() > generator.getTimeout()) {
 			LOG.warning("Wait time in queue too long. "
-					+ String.valueOf(processStartTime - getStartTime())
-					+ " ms passed before transaction was even started.");
-			return new HTTPTransactionResult(this.getTargetTime(), ResultTracker.TransactionState.DROPPED, requestNum);
+				+ String.valueOf(processStartTime - getStartTime())
+				+ " ms passed before transaction was even started.");
+			logResultAndReleaseResources(
+				new HTTPTransactionResult(
+					this.getTargetTime(),
+					ResultTracker.TransactionState.DROPPED,
+					requestNum
+				),
+				generator
+			);
+			return;
 		}
 
 		String url = generator.getNextInput().trim();
-		requestNum = generator.getCurrentCallNum();
 		String method = "GET";
 		if (url.startsWith("[")) {
 			if (url.startsWith(POST_SIGNAL)) {
@@ -74,80 +93,186 @@ public class HTTPTransaction extends Transaction {
 			}
 			url = url.replaceFirst("\\[.*?\\]", "");
 		}
-		Request request = generator.initializeHTTPRequest(url, method);
 
-		HTTPTransactionResult result = new HTTPTransactionResult(this.getTargetTime(), ResultTracker.TransactionState.SUCCESS, requestNum);
-		result.setMethod(method);
+		Request request = generator.initializeHTTPRequest(url, method);
+		HTTPTransactionResult httpResult = new HTTPTransactionResult(
+				this.getTargetTime(),
+				ResultTracker.TransactionState.SUCCESS,
+				requestNum
+		);
+		httpResult.setMethod(method);
 		int index = url.indexOf("[");
-		if (index != -1) {
-			result.setRequestURI(url.substring(0, index));
-		} else {
-			result.setRequestURI(url);
-		}
+		httpResult.setRequestURI(index != -1 ? url.substring(0, index) : url);
 
 		try {
-			ContentResponse response = request.send();
-			if (response.getStatus() >= 400) {
-				long responseTime = System.nanoTime() - performanceStartTime;
-				responseTime = TimeUnit.NANOSECONDS.toMillis(responseTime);
-				generator.revertLastCall();
-				LOG.log(Level.FINEST, "Received error response code: " + response.getStatus());
-				result.setTransactionState(TransactionState.FAILED);
-				result.setResponseTime(responseTime);
-			} else {
-				String responseBody = response.getContentAsString();
-				long responseTime = System.nanoTime() - performanceStartTime;
-				responseTime = TimeUnit.NANOSECONDS.toMillis(responseTime);
+			ResultTracker.TRACKER.addSentRequest();
+			request.send(new BufferingResponseListener() {
+				@Override
+				public void onComplete(Result result) {
+					try {
+						long responseTime = calculateResponseTime(requestStartTime);
+						httpResult.setResponseTime(responseTime);
 
-				// store result
-				generator.resetHTMLFunctions(responseBody);
-				result.setResponseTime(responseTime);
-			}
-		} catch (TimeoutException e) {
-			generator.revertLastCall();
-			result.setResponseTime(generator.getTimeout());
-			result.setTransactionState(TransactionState.TIMEOUT);
-			LOG.warning("TimeoutException: " + e.getMessage());
-		} catch (ExecutionException e) {
-			long responseTime = System.nanoTime() - performanceStartTime;
-			responseTime = TimeUnit.NANOSECONDS.toMillis(responseTime);
-			if (e.getCause() == null || !(e.getCause() instanceof TimeoutException)) {
-				LOG.log(Level.SEVERE,
-						"ExecutionException in call for URL: " + url + "; Cause: " + e.getCause().toString());
-			}
-			generator.revertLastCall();
-			result.setTransactionState(TransactionState.FAILED);
-			result.setResponseTime(responseTime);
-		} catch (CancellationException e) {
-			long responseTime = System.nanoTime() - performanceStartTime;
-			responseTime = TimeUnit.NANOSECONDS.toMillis(responseTime);
-			LOG.log(Level.SEVERE, "CancellationException: " + url + "; " + e.getMessage());
-			generator.revertLastCall();
-			result.setTransactionState(TransactionState.FAILED);
-			result.setResponseTime(responseTime);
-		} catch (InterruptedException e) {
-			long responseTime = System.nanoTime() - performanceStartTime;
-			responseTime = TimeUnit.NANOSECONDS.toMillis(responseTime);
-			LOG.log(Level.SEVERE, "InterruptedException: " + e.getMessage());
-			generator.revertLastCall();
-			result.setTransactionState(TransactionState.FAILED);
-			result.setResponseTime(responseTime);
+						//Check for exception
+						if (result.isFailed()) {
+							generator.revertLastCall();
+							httpResult.setTransactionState(TransactionState.FAILED);
+
+							Throwable e = result.getFailure();
+
+							if (e instanceof TimeoutException) {
+								httpResult.setTransactionState(TransactionState.TIMEOUT);
+								// Overwrite response time to be timeout
+								httpResult.setResponseTime(generator.getTimeout());
+								LOG.finest("TimeoutException: " + e.getMessage());
+								logResultAndReleaseResources(httpResult, generator);
+								return;
+							}
+
+							if (e instanceof ExecutionException) {
+								Throwable cause = e.getCause();
+								if (e instanceof SocketTimeoutException && isConnectTimeout(e)) {
+									httpResult.setTransactionState(TransactionState.TIMEOUT);
+									logResultAndReleaseResources(httpResult, generator);
+									return;
+								}
+								if (isNotSentException(cause)) {
+									LOG.severe("ExecutionException before sending the request: " + cause.getMessage());
+									httpResult.setTransactionState(TransactionState.DROPPED);
+								}
+								logResultAndReleaseResources(httpResult, generator);
+								return;
+							}
+
+							if (isNotSentException(e)) {
+								LOG.finest("Not sent exception: " + e.getClass().getCanonicalName() + ": " + e.getMessage());
+								httpResult.setTransactionState(TransactionState.DROPPED);
+								logResultAndReleaseResources(httpResult, generator);
+								return;
+							}
+
+							if (e instanceof SocketTimeoutException && isConnectTimeout(e)) {
+								httpResult.setTransactionState(TransactionState.TIMEOUT);
+								logResultAndReleaseResources(httpResult, generator);
+								return;
+							}
+
+							LOG.severe(e.getClass().getCanonicalName() + ": " + e.getMessage());
+							logResultAndReleaseResources(httpResult, generator);
+							return;
+						}
+
+
+						Response response = result.getResponse();
+
+						for (HttpField field : response.getHeaders().getFields(HttpHeader.SET_COOKIE)) {
+							generator.addCookie(request.getURI(), field);
+						}
+
+						// Handle 4XX and 5XX status codes
+						if (response.getStatus() >= 400) {
+							generator.revertLastCall();
+							LOG.finest("Received error response code: " + response.getStatus());
+							httpResult.setTransactionState(TransactionState.FAILED);
+
+							logResultAndReleaseResources(httpResult, generator);
+							return;
+						}
+						try {
+							String content = this.getContentAsString();
+							generator.resetHTMLFunctions(content);
+						} catch (Exception e) {
+							LOG.warning("Failed to parse response body: " + e.getMessage());
+						}
+
+						logResultAndReleaseResources(httpResult, generator);
+						return;
+					} catch (Throwable t) {
+						LOG.severe("Uncaught exception in onComplete: " + t.getClass().getSimpleName() + " - " + t.getMessage());
+						httpResult.setTransactionState(TransactionState.FAILED);
+						logResultAndReleaseResources(httpResult, generator);
+
+					}
+				}
+			});
+		} catch (Exception e) {
+			LOG.severe("Request.send() failed before listener could be attached: " + e.getMessage());
+			httpResult.setTransactionState(TransactionState.DROPPED);
+			logResultAndReleaseResources(httpResult, generator);
 		}
-
-
-		return result;
 	}
 
-	@Override
-	public void run() {
-		HTTPInputGenerator generator = HTTPInputGeneratorPool.getPool().takeFromPool();
-		HTTPTransactionResult result = this.process(generator);
+	/**
+     * Calculates the response time in milliseconds based on a given start time in nanoseconds.
+     * This method uses the current system time to compute the duration since the start.
+     *
+     * @param startNanos The start time in nanoseconds, typically captured with {@code System.nanoTime()}.
+     * @return The elapsed time in milliseconds since {@code startNanos}.
+     */
+	private long calculateResponseTime(long startNanos) {
+		return TimeUnit.NANOSECONDS.toMillis(System.nanoTime() - startNanos);
+	}
+
+	/**
+     * Checks if the provided exception represents a client-side error
+     * that occurred before the HTTP request was sent.
+     *
+     * @param cause The exception cause to check.
+     * @return true if this is a client-side error; false otherwise.
+	 */
+	private static boolean isNotSentException(Throwable cause) {
+        return cause instanceof UnknownHostException ||
+               cause instanceof NoRouteToHostException ||
+               cause instanceof ConnectException ||
+               cause instanceof UnresolvedAddressException ||
+               cause instanceof RejectedExecutionException ||
+               cause instanceof IllegalArgumentException ||
+               cause instanceof IllegalStateException ||
+               cause instanceof java.security.GeneralSecurityException ||
+               cause instanceof org.eclipse.jetty.client.HttpRequestException;
+    }
+
+	/**
+     * Determines whether the given {@link Throwable} represents a connection timeout
+     * based on its message content. This is typically used to distinguish between
+     * different types of {@link SocketTimeoutException}.
+     *
+     * @param t The {@link Throwable} to inspect.
+     * @return {@code true} if the exception message indicates a connection timeout; {@code false} otherwise.
+     */
+	private static boolean isConnectTimeout(Throwable t) {
+        return t.getMessage() != null && t.getMessage().toLowerCase().contains("connect");
+    }
+
+	/**
+     * Logs the transaction result, releases the input generator back to the pool,
+     * and requeues this transaction for future reuse.
+     *
+     * @param result The transaction result to log.
+     * @param generator The input generator used for this transaction.
+     */
+	private void logResultAndReleaseResources(HTTPTransactionResult result, HTTPInputGenerator generator) {
 		ResultTracker.TRACKER.logTransaction(result);
 		HTTPInputGeneratorPool.getPool().releaseBackToPool(generator);
 		TransactionQueueSingleton transactionQueue = TransactionQueueSingleton.getInstance();
 		transactionQueue.addQueueElement(this);
 	}
 
+	@Override
+	public void run() {
+		try {
+		HTTPInputGenerator generator = HTTPInputGeneratorPool.getPool().takeFromPool();
+		processAsync(generator);
+		} catch (Exception e) {
+			LOG.severe("Unexpected error in HTTPTransaction.run: " +
+				e.getClass().getCanonicalName() + ": " + e.getMessage());
+		}
+	}
+
+	/**
+	 * Represents the result of an HTTP transaction including timing, status,
+ 	 * and request metadata.
+ 	 */
 	public class HTTPTransactionResult {
 		private long responseTime = 0;
 

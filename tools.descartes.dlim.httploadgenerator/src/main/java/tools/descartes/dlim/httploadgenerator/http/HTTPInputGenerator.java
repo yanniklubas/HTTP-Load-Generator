@@ -16,13 +16,19 @@
 package tools.descartes.dlim.httploadgenerator.http;
 
 import java.io.File;
+import java.net.CookieStore;
+import java.net.HttpCookie;
+import java.net.URI;
+import java.util.List;
 import java.util.concurrent.TimeUnit;
 import java.util.logging.Logger;
 import java.util.regex.Pattern;
+import java.util.stream.Collectors;
 
 import org.eclipse.jetty.client.HttpClient;
 import org.eclipse.jetty.client.Request;
 import org.eclipse.jetty.client.StringRequestContent;
+import org.eclipse.jetty.http.HttpField;
 import org.eclipse.jetty.http.HttpMethod;
 import org.luaj.vm2.Globals;
 import org.luaj.vm2.LuaTable;
@@ -51,6 +57,7 @@ public class HTTPInputGenerator {
 	private static final String JSON_SIGNAL = "[JSON]";
 
 	private final HttpClient httpClient;
+	private final CookieStore cookieStore;
 
 	private int id;
 
@@ -75,19 +82,13 @@ public class HTTPInputGenerator {
 	 * @param randomSeed Seed for Lua random function.
 	 * @param timeout    The http read timeout.
 	 */
-	public HTTPInputGenerator(int id, File scriptFile, int randomSeed, int timeout) {
+	public HTTPInputGenerator(int id, File scriptFile, int randomSeed, int timeout, HttpClient httpClient) {
 		this.id = id;
-		httpClient = new HttpClient();
-		httpClient.setMaxConnectionsPerDestination(1);
+		this.httpClient = httpClient;
+		this.cookieStore = new java.net.CookieManager().getCookieStore();
 
 		if (timeout > 0) {
-			httpClient.setConnectTimeout(timeout);
 			this.timeout = timeout;
-		}
-		try {
-			httpClient.start();
-		} catch (Exception e) {
-			LOG.severe("Could not start HTTP client; Exception: " + e.getMessage());
 		}
 
 		if (scriptFile != null) {
@@ -108,27 +109,51 @@ public class HTTPInputGenerator {
 	 */
 	public Request initializeHTTPRequest(String url, String method) {
 		Request request;
+		URI uri;
 		if (method.equalsIgnoreCase("POST")) {
 			String split[] = url.split(Pattern.quote(JSON_SIGNAL), 2);
 			url = split[0].trim();
 			request = httpClient.POST(url);
+			uri = URI.create(url);
 			if (split.length == 2) {
 				request.body(new StringRequestContent("application/json", split[1]));
 			}
 		} else if (method.equalsIgnoreCase("PUT")) {
 			request = httpClient.newRequest(url).method(HttpMethod.PUT);
+			uri = URI.create(url);
 		} else {
 			request = httpClient.newRequest(url);
+			uri = URI.create(url);
 		}
 		request = request.agent(USER_AGENT).headers(headers -> {
 			headers.put("Connection", "close");
 		});
+		List<org.eclipse.jetty.http.HttpCookie> cookies = getCookies(uri);
+		for (org.eclipse.jetty.http.HttpCookie cookie : cookies) {
+			request = request.cookie(cookie);
+		}
+
 		if (timeout > 0) {
 			request = request.timeout(timeout, TimeUnit.MILLISECONDS)
 					.idleTimeout(timeout, TimeUnit.MILLISECONDS);
 		}
 		return request;
 	}
+
+	public void addCookie(URI uri, HttpField field) {
+		List<HttpCookie> cookies = HttpCookie.parse(field.getValue());
+		for (HttpCookie cookie: cookies) {
+			cookieStore.add(uri, cookie);
+		}
+	}
+
+	private List<org.eclipse.jetty.http.HttpCookie> getCookies(URI uri) {
+        List<HttpCookie> cookies = cookieStore.get(uri);
+        return cookies.stream()
+            .filter(c -> !c.hasExpired())
+	    .map(c -> org.eclipse.jetty.http.HttpCookie.from(c))
+            .collect(Collectors.toList());
+    }
 
 	/**
 	 * Returns the next URL for the HTTPTransaction. Runs the script.
@@ -156,9 +181,10 @@ public class HTTPInputGenerator {
 	 */
 	private void restartCycle() {
 		currentCallNum = 1;
-		if (httpClient != null && httpClient.getHttpCookieStore() != null) {
-			httpClient.getHttpCookieStore().clear();
-		}
+		// if (httpClient != null && httpClient.getHttpCookieStore() != null) {
+		// 	httpClient.getHttpCookieStore().clear();
+		// }
+		cookieStore.removeAll();
 		LuaValue cycleInit = luaGlobals.get(LUA_CYCLE_INIT);
 		if (!cycleInit.isnil()) {
 			cycleInit.call();

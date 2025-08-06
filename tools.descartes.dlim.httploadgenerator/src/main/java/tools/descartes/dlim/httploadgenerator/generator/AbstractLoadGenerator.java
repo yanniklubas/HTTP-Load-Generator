@@ -155,13 +155,13 @@ public abstract class AbstractLoadGenerator extends Thread {
 					startBenchmark(line.trim().split(","));
 					disconnectFromDirector();
 					break;
-				} else if (line.startsWith(IRunnerConstants.THREAD_NUM_KEY)) {
+				} else if (line.startsWith(IRunnerConstants.USER_NUM_KEY)) {
 					if (this instanceof ArrivalRateTupleLoadGenerator) {
 						try {
 							int threads = Integer.parseInt(line.split(":")[1].trim());
-							((ArrivalRateTupleLoadGenerator) this).setNumberOfThreads(threads);
+							((ArrivalRateTupleLoadGenerator) this).setNumberOfVirtualUsers(threads);
 						} catch (IndexOutOfBoundsException | NumberFormatException e) {
-							LOG.log(Level.WARNING, "Invalid thread count.");
+							LOG.log(Level.WARNING, "Invalid virtual user count.");
 						}
 						ok();
 					}
