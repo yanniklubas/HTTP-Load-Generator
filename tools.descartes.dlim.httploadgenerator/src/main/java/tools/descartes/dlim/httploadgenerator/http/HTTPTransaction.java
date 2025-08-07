@@ -145,7 +145,7 @@ public class HTTPTransaction extends Transaction {
 							}
 
 							if (isNotSentException(e)) {
-								LOG.finest("Not sent exception: " + e.getClass().getCanonicalName() + ": " + e.getMessage());
+								LOG.severe("Not sent exception: " + e.getClass().getCanonicalName() + ": " + e.getMessage());
 								httpResult.setTransactionState(TransactionState.DROPPED);
 								logResultAndReleaseResources(httpResult, generator);
 								return;
@@ -157,7 +157,7 @@ public class HTTPTransaction extends Transaction {
 								return;
 							}
 
-							LOG.severe(e.getClass().getCanonicalName() + ": " + e.getMessage());
+							LOG.finest(e.getClass().getCanonicalName() + ": " + e.getMessage());
 							logResultAndReleaseResources(httpResult, generator);
 							return;
 						}
