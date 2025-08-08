@@ -33,6 +33,7 @@ import org.eclipse.jetty.client.Response;
 import org.eclipse.jetty.client.Result;
 import org.eclipse.jetty.http.HttpField;
 import org.eclipse.jetty.http.HttpHeader;
+import org.luaj.vm2.LuaError;
 
 import tools.descartes.dlim.httploadgenerator.generator.ResultTracker;
 import tools.descartes.dlim.httploadgenerator.generator.ResultTracker.TransactionState;
@@ -82,7 +83,21 @@ public class HTTPTransaction extends Transaction {
 			return;
 		}
 
-		String url = generator.getNextInput().trim();
+		String url="";
+		try {
+			url = generator.getNextInput().trim();
+		} catch (LuaError e) {
+			LOG.severe("Error in Lua Script: " + e.getMessage());
+			logResultAndReleaseResources(
+				new HTTPTransactionResult(
+					this.getTargetTime(),
+					ResultTracker.TransactionState.DROPPED,
+					requestNum
+				),
+				generator
+			);
+			return;
+		}
 		String method = "GET";
 		if (url.startsWith("[")) {
 			if (url.startsWith(POST_SIGNAL)) {
