@@ -130,7 +130,6 @@ public class HTTPTransaction extends Transaction {
 
 						//Check for exception
 						if (result.isFailed()) {
-							generator.revertLastCall();
 							httpResult.setTransactionState(TransactionState.FAILED);
 
 							Throwable e = result.getFailure();
@@ -186,7 +185,6 @@ public class HTTPTransaction extends Transaction {
 
 						// Handle 4XX and 5XX status codes
 						if (response.getStatus() >= 400) {
-							generator.revertLastCall();
 							LOG.finest("Received error response code: " + response.getStatus());
 							httpResult.setTransactionState(TransactionState.FAILED);
 
@@ -267,6 +265,9 @@ public class HTTPTransaction extends Transaction {
      * @param generator The input generator used for this transaction.
      */
 	private void logResultAndReleaseResources(HTTPTransactionResult result, HTTPInputGenerator generator) {
+		if (result.getTransactionState() != TransactionState.SUCCESS) {
+			generator.revertLastCall();
+		}
 		ResultTracker.TRACKER.logTransaction(result);
 		HTTPInputGeneratorPool.getPool().releaseBackToPool(generator);
 		TransactionQueueSingleton transactionQueue = TransactionQueueSingleton.getInstance();
