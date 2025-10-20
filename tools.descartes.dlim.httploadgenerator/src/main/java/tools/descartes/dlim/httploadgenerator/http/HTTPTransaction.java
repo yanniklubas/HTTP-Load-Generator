@@ -267,6 +267,8 @@ public class HTTPTransaction extends Transaction {
 	private void logResultAndReleaseResources(HTTPTransactionResult result, HTTPInputGenerator generator) {
 		if (result.getTransactionState() != TransactionState.SUCCESS) {
 			generator.revertLastCall();
+		} else {
+			generator.resetRetries();
 		}
 		ResultTracker.TRACKER.logTransaction(result);
 		HTTPInputGeneratorPool.getPool().releaseBackToPool(generator);

@@ -56,13 +56,17 @@ public class HTTPInputGenerator {
 
 	private static final String JSON_SIGNAL = "[JSON]";
 
+	private static final int MAX_RETRIES = Integer.MAX_VALUE;
+
 	private final HttpClient httpClient;
 	private final CookieStore cookieStore;
 
 	private int id;
+	private int retries = 0;
 
 	private int currentCallNum = 0;
 	private String lastInput = "";
+	private String currentCycleInput = null;
 	private int timeout = 0;
 
 	private HTMLFunctions htmlFunctions = new HTMLFunctions("");
@@ -164,6 +168,11 @@ public class HTTPInputGenerator {
 		if (currentCallNum < 1) {
 			restartCycle();
 		}
+		if (this.currentCycleInput != null) {
+			lastInput = currentCycleInput;
+			currentCycleInput = null;
+			return lastInput;
+		}
 		LuaValue lvcall = luaGlobals.get(LUA_CALL).call(LuaValue.valueOf(currentCallNum));
 		if (lvcall.isnil()) {
 			restartCycle();
@@ -184,11 +193,16 @@ public class HTTPInputGenerator {
 		// if (httpClient != null && httpClient.getHttpCookieStore() != null) {
 		// 	httpClient.getHttpCookieStore().clear();
 		// }
+		this.resetRetries();
 		cookieStore.removeAll();
 		LuaValue cycleInit = luaGlobals.get(LUA_CYCLE_INIT);
 		if (!cycleInit.isnil()) {
 			cycleInit.call();
 		}
+	}
+
+	public void resetRetries() {
+		this.retries = 0;
 	}
 
 	/**
@@ -197,6 +211,13 @@ public class HTTPInputGenerator {
 	 * @return The current number of the lua call.
 	 */
 	public int getCurrentCallNum() {
+		if (this.currentCycleInput == null) {
+			this.currentCycleInput = getNextInput();
+		}
+
+		if (this.currentCycleInput != null) {
+			return currentCallNum--;
+		}
 		return currentCallNum;
 	}
 
@@ -233,7 +254,13 @@ public class HTTPInputGenerator {
 	 * in order to be repeat it on the next call of {@link #getNextInput()}.
 	 */
 	public void revertLastCall() {
-		currentCallNum--;
+		this.retries += 1;
+
+		if (this.retries < MAX_RETRIES) {
+			currentCallNum--;
+		} else {
+			this.resetRetries();
+		}
 	}
 
 	/**
