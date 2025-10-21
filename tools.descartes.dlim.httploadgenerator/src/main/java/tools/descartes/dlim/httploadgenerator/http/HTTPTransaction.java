@@ -215,6 +215,7 @@ public class HTTPTransaction extends Transaction {
 		}
 	}
 
+
 	/**
      * Calculates the response time in milliseconds based on a given start time in nanoseconds.
      * This method uses the current system time to compute the duration since the start.
@@ -257,6 +258,14 @@ public class HTTPTransaction extends Transaction {
         return t.getMessage() != null && t.getMessage().toLowerCase().contains("connect");
     }
 
+	static void resetGeneratorBasedOnTransactionState(TransactionState state, HTTPInputGenerator generator) {
+		if (state != TransactionState.SUCCESS) {
+			generator.revertLastCall();
+		} else {
+			generator.resetRetries();
+		}
+	}
+
 	/**
      * Logs the transaction result, releases the input generator back to the pool,
      * and requeues this transaction for future reuse.
@@ -265,11 +274,7 @@ public class HTTPTransaction extends Transaction {
      * @param generator The input generator used for this transaction.
      */
 	private void logResultAndReleaseResources(HTTPTransactionResult result, HTTPInputGenerator generator) {
-		if (result.getTransactionState() != TransactionState.SUCCESS) {
-			generator.revertLastCall();
-		} else {
-			generator.resetRetries();
-		}
+		resetGeneratorBasedOnTransactionState(result.getTransactionState(), generator);
 		ResultTracker.TRACKER.logTransaction(result);
 		HTTPInputGeneratorPool.getPool().releaseBackToPool(generator);
 		TransactionQueueSingleton transactionQueue = TransactionQueueSingleton.getInstance();

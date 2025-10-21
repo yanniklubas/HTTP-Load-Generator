@@ -56,7 +56,7 @@ public class HTTPInputGenerator {
 
 	private static final String JSON_SIGNAL = "[JSON]";
 
-	private static final int MAX_RETRIES = Integer.MAX_VALUE;
+	private int MAX_TRIES = Integer.MAX_VALUE;
 
 	private final HttpClient httpClient;
 	private final CookieStore cookieStore;
@@ -152,12 +152,16 @@ public class HTTPInputGenerator {
 	}
 
 	private List<org.eclipse.jetty.http.HttpCookie> getCookies(URI uri) {
-        List<HttpCookie> cookies = cookieStore.get(uri);
-        return cookies.stream()
-            .filter(c -> !c.hasExpired())
-	    .map(c -> org.eclipse.jetty.http.HttpCookie.from(c))
-            .collect(Collectors.toList());
-    }
+		List<HttpCookie> cookies = cookieStore.get(uri);
+		return cookies.stream()
+		.filter(c -> !c.hasExpired())
+		.map(c -> org.eclipse.jetty.http.HttpCookie.from(c))
+		.collect(Collectors.toList());
+	}
+
+	int getRetries() {
+		return this.retries;
+	}
 
 	/**
 	 * Returns the next URL for the HTTPTransaction. Runs the script.
@@ -216,8 +220,9 @@ public class HTTPInputGenerator {
 		}
 
 		if (this.currentCycleInput != null) {
-			return currentCallNum--;
+			return currentCallNum-1;
 		}
+		// Should never happen
 		return currentCallNum;
 	}
 
@@ -255,9 +260,10 @@ public class HTTPInputGenerator {
 	 */
 	public void revertLastCall() {
 		this.retries += 1;
+		this.currentCycleInput = null;
 
-		if (this.retries < MAX_RETRIES) {
-			currentCallNum--;
+		if (this.retries < MAX_TRIES) {
+			currentCallNum = Math.max(0, currentCallNum - 1);
 		} else {
 			this.resetRetries();
 		}
@@ -274,6 +280,14 @@ public class HTTPInputGenerator {
 
 	int getId() {
 		return id;
+	}
+
+	void setLuaGlobals(Globals globals) {
+		this.luaGlobals = globals;
+	}
+
+	void setMaxTries(int maxTries) {
+		this.MAX_TRIES = maxTries;
 	}
 
 	/**
