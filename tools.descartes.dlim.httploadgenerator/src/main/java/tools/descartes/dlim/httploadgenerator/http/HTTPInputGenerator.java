@@ -56,7 +56,7 @@ public class HTTPInputGenerator {
 
 	private static final String JSON_SIGNAL = "[JSON]";
 
-	private int MAX_TRIES = Integer.MAX_VALUE;
+	private int MAX_TRIES = 0;
 
 	private final HttpClient httpClient;
 	private final CookieStore cookieStore;
